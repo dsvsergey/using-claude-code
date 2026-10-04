@@ -1,7 +1,7 @@
 // Applies component actions: create/merge files with backups, run commands, honor --dry-run.
 import fs from 'node:fs';
 import path from 'node:path';
-import { appendLines, mergeJson, parseJson } from './merge.mjs';
+import { appendBlock, appendLines, mergeJson, parseJson } from './merge.mjs';
 
 export function timestamp(d) {
   const p = (n) => String(n).padStart(2, '0');
@@ -72,6 +72,14 @@ function applyLines(a, ctx) {
   return commit(a.target, before, text, 'merged', `+${added}`, ctx);
 }
 
+function applyBlock(a, ctx) {
+  const before = read(a.target);
+  const { text, added } = appendBlock(before ?? '', a.marker, a.content);
+  if (before === null) return commit(a.target, null, text, 'created', '', ctx);
+  if (!added) return [entry('unchanged', a.target)];
+  return commit(a.target, before, text, 'merged', '+block', ctx);
+}
+
 async function applyExec(a, ctx) {
   if (ctx.dryRun) return [entry('would', a.label, a.command)];
   if (a.confirm && !ctx.yes && !(await ctx.confirm(`${a.label}: ${a.command}`))) {
@@ -98,6 +106,7 @@ async function executeAction(a, ctx) {
     case 'file': return applyFile(a, ctx);
     case 'json': return applyJson(a, ctx);
     case 'lines': return applyLines(a, ctx);
+    case 'block': return applyBlock(a, ctx);
     case 'exec': return applyExec(a, ctx);
     case 'require': return applyRequire(a, ctx);
     case 'skip': return [entry('skipped', a.target, a.reason)];

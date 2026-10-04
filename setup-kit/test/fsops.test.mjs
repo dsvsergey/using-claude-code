@@ -183,3 +183,15 @@ test('json: two merges into one file in the same run keep the original bytes in 
   await executeActions([{ type: 'json', target: f, template: { b: 2 } }], ctx);
   assert.equal(fs.readFileSync(`${f}.bak-20261004-120000`, 'utf8'), '{"model":"opus"}');
 });
+
+test('block: created, appended once, never duplicated', async () => {
+  const d = tmpDir();
+  const f = path.join(d, 'CLAUDE.md');
+  const a = { type: 'block', target: f, marker: 'setup-kit', content: '<!-- setup-kit:start -->\nX\n<!-- setup-kit:end -->\n' };
+  assert.equal((await executeActions([a], ctxOf()))[0].status, 'created');
+  assert.equal(fs.readFileSync(f, 'utf8'), a.content);
+  fs.writeFileSync(f, '# mine\n');
+  assert.deepEqual(await executeActions([a], ctxOf()), [{ status: 'merged', target: f, detail: '+block' }]);
+  assert.equal(fs.readFileSync(f, 'utf8'), '# mine\n\n' + a.content);
+  assert.equal((await executeActions([a], ctxOf()))[0].status, 'unchanged');
+});

@@ -72,6 +72,13 @@ function mergeHookEntries(u, t, stats) {
   return out;
 }
 
+// Appends a <!-- marker:start --> … <!-- marker:end --> block once; the rest of the file is never touched.
+export function appendBlock(text, marker, content) {
+  if (text.includes(`<!-- ${marker}:start -->`)) return { text, added: false };
+  const sep = text === '' ? '' : text.endsWith('\n') ? '\n' : '\n\n';
+  return { text: text + sep + content, added: true };
+}
+
 export function appendLines(text, lines) {
   const existing = new Set(text.split(/\r?\n/).map((l) => l.trim()));
   const missing = lines.filter((l) => !existing.has(l.trim()));

@@ -2,17 +2,19 @@
 
 [Українська](README.md) · **English**
 
-Configures a developer machine and a repository the way the team guide (`../index.html`) describes.
+Configures Claude Code **globally** — for every session and project (`~/.claude`) — the way the team guide (`../index.html`) describes.
+Configuring a specific repository is optional and happens only with `--project <path>`.
 Re-running is safe: existing files are never overwritten, JSON is merged, and a `.bak-…` copy is made before any change.
 
 ## Usage
 
 macOS / Linux:
 ```bash
-./setup-kit/setup.sh --dry-run              # preview what would change
-./setup-kit/setup.sh                        # interactive, y/n for each component
-./setup-kit/setup.sh --preset full --yes    # everything, no questions
-./setup-kit/setup.sh doctor                 # check the current state
+./setup-kit/setup.sh --dry-run                          # preview what would change
+./setup-kit/setup.sh                                    # global, y/n for each component
+./setup-kit/setup.sh --preset full --yes                # everything global, no questions
+./setup-kit/setup.sh --project ~/code/my-repo --preset minimal   # also set up a repository
+./setup-kit/setup.sh doctor                             # check the current state
 ```
 
 Windows (PowerShell, incl. RDP — only the current user's profile is changed):
@@ -29,8 +31,9 @@ Requires Node.js ≥ 18 — the script offers to install it (winget / brew).
 
 | Flag | What it does |
 |---|---|
-| `--user` | developer machine only (`~/.claude`) |
-| `--project <path>` | repository only (defaults to the current folder unless `--user` is given) |
+| (no flags) | global: `~/.claude`, for every session |
+| `--project <path>` | only the given repository |
+| `--user --project <path>` | both global and the repository |
 | `--preset minimal\|full` | predefined component set |
 | `--with a,b` / `--without c,d` | add / remove components |
 | `--yes` | no questions (without a preset = `minimal`) |
@@ -39,29 +42,38 @@ Requires Node.js ≥ 18 — the script offers to install it (winget / brew).
 
 ## Components
 
-| id | Scope | minimal | full |
-|---|---|:-:|:-:|
-| `claude` — Claude Code CLI (+ PATH on Windows) | user | ✓ | ✓ |
-| `user-settings` — deny rules for `.env`/secrets | user | ✓ | ✓ |
-| `statusline` — context usage in the status line (ccstatusline) | user | | ✓ |
-| `ccusage` — token cost analysis | user | | ✓ |
-| `engram` — memory across sessions | user | | ✓ |
-| `claude-md` — `CLAUDE.md` skeleton + `.gitignore` | project | ✓ | ✓ |
-| `project-settings` — allow/deny permissions | project | ✓ | ✓ |
-| `context7` — library docs MCP | project | ✓ | ✓ |
-| `format-hook` — prettier after Edit/Write (if the project uses prettier) | project | | ✓ |
-| `agents` — code-reviewer, test-writer, `/review-pr` | project | | ✓ |
-| `adr` — `docs/adr/` | project | | ✓ |
-| `serena` — code navigation MCP (needs uv) | project | | ✓ |
-| `graphify` — knowledge graph (needs uv) | project | | ✓ |
-| `speckit` — Spec Kit (needs uv) | project | | ✓ |
+**Global** (`~/.claude`, every session):
 
-After running: `claude` → `/login` → `/status` → `/mcp`, then commit `CLAUDE.md .claude/ .mcp.json docs/adr/`.
+| id | minimal | full |
+|---|:-:|:-:|
+| `claude` — Claude Code CLI (+ PATH on Windows) | ✓ | ✓ |
+| `user-settings` — deny rules for `.env`/secrets | ✓ | ✓ |
+| `context7` — library docs MCP (`claude mcp add --scope user`) | ✓ | ✓ |
+| `global-claude-md` — team rules block in `~/.claude/CLAUDE.md` | | ✓ |
+| `statusline` — context usage in the status line (ccstatusline) | | ✓ |
+| `ccusage` — token cost analysis | | ✓ |
+| `engram` — memory across sessions | | ✓ |
+| `agents` — code-reviewer, test-writer, `/review-pr` in `~/.claude` | | ✓ |
+| `serena` — code navigation MCP, works in the current folder (needs uv) | | ✓ |
+| `graphify` — knowledge graph CLI and skill; a graph is built only when you ask (needs uv) | | ✓ |
+| `speckit` — the `specify` CLI (needs uv) | | ✓ |
+
+**Repository** (only with `--project <path>`):
+
+| id | minimal | full |
+|---|:-:|:-:|
+| `claude-md` — `CLAUDE.md` skeleton + `.gitignore` | ✓ | ✓ |
+| `project-settings` — allow/deny in `.claude/settings.json` | ✓ | ✓ |
+| `adr` — `docs/adr/` | | ✓ |
+| `format-hook` — prettier after Edit/Write (if the project uses prettier) | | ✓ |
+| `speckit-init` — `specify init` (skipped with `--yes` in a non-empty repo) | | ✓ |
+
+After running: `claude` → `/login` → `/status` → `/mcp`. For a repository: fill in the `CLAUDE.md` skeleton, then commit `CLAUDE.md .claude/ docs/adr/`.
 
 ## Verifying on Windows / RDP (for the team)
 
 1. `powershell -ExecutionPolicy Bypass -File .\setup-kit\setup.ps1 --dry-run` — only `?` lines, exit code 0.
-2. In a test repository: `...\setup.ps1 --project . --preset minimal --yes`.
+2. Global: `...\setup.ps1 --preset minimal --yes`.
 3. Open a new terminal → `claude --version` works (PATH fixed).
 4. `...\setup.ps1 doctor` — every item is `✓`.
 5. Repeat step 2 — every line is `=` (nothing changed).

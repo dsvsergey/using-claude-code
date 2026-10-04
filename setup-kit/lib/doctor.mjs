@@ -1,4 +1,5 @@
 // Read-only checks that mirror the onboarding checklist (guide section 12).
+// Global checks always run; repository checks only when ctx.checkProject is set (--project).
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseJson } from './merge.mjs';
@@ -10,10 +11,12 @@ export function runDoctor(ctx) {
   add(Boolean(ctx.run.which('claude')), 'claude in PATH');
 
   const userSettings = path.join(ctx.home, '.claude', 'settings.json');
+  const userState = path.join(ctx.home, '.claude.json');
   const projectSettings = path.join(ctx.project, '.claude', 'settings.json');
   const mcpFile = path.join(ctx.project, '.mcp.json');
+  const files = ctx.checkProject ? [userSettings, userState, projectSettings, mcpFile] : [userSettings, userState];
   const parsed = {};
-  for (const f of [userSettings, projectSettings, mcpFile]) {
+  for (const f of files) {
     if (!fs.existsSync(f)) continue;
     const r = parseJson(fs.readFileSync(f, 'utf8'));
     add(r.ok, `valid JSON: ${f}`, r.ok ? '' : r.error);
@@ -25,10 +28,11 @@ export function runDoctor(ctx) {
     return Array.isArray(d) ? d : [];
   });
   add(deny.includes('Read(./.env)'), 'Read(./.env) in permissions.deny');
-  add(fs.existsSync(path.join(ctx.project, 'CLAUDE.md')), 'CLAUDE.md in project');
+  if (ctx.checkProject) add(fs.existsSync(path.join(ctx.project, 'CLAUDE.md')), 'CLAUDE.md in project');
 
-  for (const [name, server] of Object.entries(parsed[mcpFile]?.mcpServers ?? {})) {
-    if (server.command) add(Boolean(ctx.run.which(server.command)), `MCP ${name}: ${server.command} in PATH`);
+  const servers = { ...(parsed[userState]?.mcpServers ?? {}), ...(parsed[mcpFile]?.mcpServers ?? {}) };
+  for (const [name, server] of Object.entries(servers)) {
+    if (server?.command) add(Boolean(ctx.run.which(server.command)), `MCP ${name}: ${server.command} in PATH`);
   }
   return checks;
 }

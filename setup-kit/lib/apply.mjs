@@ -36,7 +36,7 @@ export function parseCli(argv) {
   const explicit = [...(values.user ? ['user'] : []), ...(values.project !== undefined ? ['project'] : [])];
   return {
     command: positionals[0] ?? 'apply',
-    scopes: explicit.length ? explicit : ['user', 'project'],
+    scopes: explicit.length ? explicit : ['user'],
     project: values.project,
     preset: values.preset,
     withIds: list(values.with),
@@ -132,7 +132,7 @@ export async function main(argv, deps = {}) {
   }
 
   const project = path.resolve(deps.cwd ?? process.cwd(), opts.project ?? '.');
-  if (!fs.existsSync(project) || !fs.statSync(project).isDirectory()) {
+  if (opts.project !== undefined && (!fs.existsSync(project) || !fs.statSync(project).isDirectory())) {
     out(t(lang, 'noProject', { path: project }));
     return 2;
   }
@@ -147,6 +147,7 @@ export async function main(argv, deps = {}) {
     templatesDir: TEMPLATES,
     yes: opts.yes,
     dryRun: opts.dryRun,
+    checkProject: opts.project !== undefined,
     now: deps.now ?? (() => new Date()),
     confirm: async (q) => (await ask(`${q} [y/N] `, false)) ?? false,
   };

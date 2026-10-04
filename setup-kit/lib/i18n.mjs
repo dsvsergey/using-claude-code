@@ -6,7 +6,8 @@ const STR = {
   setup [--user] [--project <path>] [--preset minimal|full] [--with a,b] [--without c,d] [--yes] [--dry-run] [--lang uk|ru]
   setup doctor [--project <path>]
 
-Без --user/--project налаштовуються обидва рівні. Без --preset і --yes — питання y/n по кожному компоненту.
+Без прапорців — глобально (~/.claude, для всіх сесій Claude). --project <path> — ще й конкретний репозиторій.
+Без --preset і --yes — питання y/n по кожному компоненту.
 Компоненти: {ids}`,
     ask: '{id} — {desc}?',
     noTty: 'Немає інтерактивного терміналу: беру набір minimal.',
@@ -22,7 +23,8 @@ const STR = {
   setup [--user] [--project <path>] [--preset minimal|full] [--with a,b] [--without c,d] [--yes] [--dry-run] [--lang uk|ru]
   setup doctor [--project <path>]
 
-Без --user/--project настраиваются оба уровня. Без --preset и --yes — вопросы y/n по каждому компоненту.
+Без флагов — глобально (~/.claude, для всех сессий Claude). --project <path> — ещё и конкретный репозиторий.
+Без --preset и --yes — вопросы y/n по каждому компоненту.
 Компоненты: {ids}`,
     ask: '{id} — {desc}?',
     noTty: 'Нет интерактивного терминала: беру набор minimal.',

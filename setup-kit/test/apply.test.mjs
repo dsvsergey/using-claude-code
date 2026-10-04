@@ -32,38 +32,59 @@ function setup({ present = ['claude', 'npx', 'uv', 'graphify'], files = {}, ask 
 
 const read = (...p) => fs.readFileSync(path.join(...p), 'utf8');
 
-test('parseCli: defaults and lists', () => {
+test('parseCli: global by default; --project adds the repo level', () => {
   const o = parseCli(['--with', 'agents, adr', '--dry-run']);
-  assert.deepEqual(o.scopes, ['user', 'project']);
+  assert.deepEqual(o.scopes, ['user']);
   assert.deepEqual(o.withIds, ['agents', 'adr']);
   assert.equal(o.dryRun, true);
   assert.deepEqual(parseCli(['--user']).scopes, ['user']);
   assert.deepEqual(parseCli(['--project', '.']).scopes, ['project']);
+  assert.deepEqual(parseCli(['--user', '--project', '.']).scopes, ['user', 'project']);
   assert.equal(parseCli(['doctor']).command, 'doctor');
 });
 
-test('minimal on an empty project creates the base files', async () => {
+test('default run is global only: configures ~/.claude, never touches the current folder', async () => {
   const s = setup();
   assert.equal(await s.go('--preset', 'minimal', '--yes'), 0);
-  for (const f of ['CLAUDE.md', '.gitignore', '.claude/settings.json', '.mcp.json']) {
-    assert.ok(fs.existsSync(path.join(s.project, f)), f);
-  }
+  assert.deepEqual(walk(s.project), []);
   assert.ok(JSON.parse(read(s.home, '.claude', 'settings.json')).permissions.deny.includes('Read(./.env)'));
-  assert.equal(JSON.parse(read(s.project, '.mcp.json')).mcpServers.context7.type, 'http');
-  assert.ok(!fs.existsSync(path.join(s.project, '.claude', 'agents')));
+  assert.ok(s.calls.some((c) => c.cmd === 'claude mcp add --scope user --transport http context7 https://mcp.context7.com/mcp'));
   assert.ok(s.lines.some((l) => l.includes('/login')));
+  assert.ok(!s.lines.some((l) => l.includes('Закомітьте')));
+});
+
+test('full global run installs agents and the CLAUDE.md block into ~/.claude', async () => {
+  const s = setup({ present: ['claude', 'npx', 'uv', 'graphify', 'specify', 'engram'], files: { 'home/.claude/CLAUDE.md': '# my rules\n' } });
+  assert.equal(await s.go('--preset', 'full', '--yes'), 0);
+  assert.deepEqual(walk(s.project), []);
+  assert.ok(fs.existsSync(path.join(s.home, '.claude', 'agents', 'code-reviewer.md')));
+  assert.ok(fs.existsSync(path.join(s.home, '.claude', 'commands', 'review-pr.md')));
+  const md = read(s.home, '.claude', 'CLAUDE.md');
+  assert.ok(md.startsWith('# my rules\n\n<!-- setup-kit:start -->'));
+  assert.equal(await s.go('--preset', 'full', '--yes'), 0);
+  assert.equal(read(s.home, '.claude', 'CLAUDE.md'), md, 'block is added only once');
+});
+
+test('--project creates the repo files and leaves home alone', async () => {
+  const s = setup();
+  assert.equal(await s.go('--project', '.', '--preset', 'minimal', '--yes'), 0);
+  for (const f of ['CLAUDE.md', '.gitignore', '.claude/settings.json']) assert.ok(fs.existsSync(path.join(s.project, f)), f);
+  assert.ok(!fs.existsSync(path.join(s.project, '.mcp.json')));
+  assert.ok(read(s.project, '.gitignore').includes('*.bak-*'));
+  assert.ok(!fs.existsSync(path.join(s.home, '.claude')));
   assert.ok(s.lines.some((l) => l.includes('Закомітьте') && l.includes('CLAUDE.md') && l.includes('.claude/')));
+  assert.ok(s.lines.some((l) => l.includes('fill in')));
 });
 
 test('second run changes nothing (no writes, no backups)', async () => {
   const s = setup();
-  await s.go('--preset', 'minimal', '--yes');
+  await s.go('--user', '--project', '.', '--preset', 'minimal', '--yes');
   const before = walk(s.root);
-  assert.equal(await s.go('--preset', 'minimal', '--yes'), 0);
+  assert.equal(await s.go('--user', '--project', '.', '--preset', 'minimal', '--yes'), 0);
   assert.deepEqual(walk(s.root), before);
 });
 
-test('existing CLAUDE.md untouched; existing settings merged with backup; --project leaves home alone', async () => {
+test('existing CLAUDE.md untouched; existing settings merged with backup', async () => {
   const s = setup({
     files: {
       'proj/CLAUDE.md': '# mine\n',
@@ -75,13 +96,12 @@ test('existing CLAUDE.md untouched; existing settings merged with backup; --proj
   const ps = JSON.parse(read(s.project, '.claude', 'settings.json'));
   assert.deepEqual(ps.permissions.allow.slice(0, 2), ['Bash(make:*)', 'Bash(git status)']);
   assert.ok(fs.existsSync(path.join(s.project, '.claude', 'settings.json.bak-20261004-120000')));
-  assert.ok(!fs.existsSync(path.join(s.home, '.claude')));
 });
 
 test('dry-run writes nothing and runs nothing', async () => {
   const s = setup({ present: ['brew', 'npx'] });
   const before = walk(s.root);
-  assert.equal(await s.go('--preset', 'full', '--yes', '--dry-run'), 0);
+  assert.equal(await s.go('--user', '--project', '.', '--preset', 'full', '--yes', '--dry-run'), 0);
   assert.deepEqual(walk(s.root), before);
   assert.deepEqual(s.calls, []);
   assert.ok(s.lines.some((l) => l.includes('--dry-run')));
@@ -89,8 +109,8 @@ test('dry-run writes nothing and runs nothing', async () => {
 
 test('full: a failed component does not stop the others; exit code 1', async () => {
   const s = setup({ present: ['claude', 'npx', 'brew'] });
-  assert.equal(await s.go('--preset', 'full', '--yes'), 1);
-  assert.ok(fs.existsSync(path.join(s.project, '.claude', 'agents', 'code-reviewer.md')));
+  assert.equal(await s.go('--user', '--project', '.', '--preset', 'full', '--yes'), 1);
+  assert.ok(fs.existsSync(path.join(s.home, '.claude', 'agents', 'code-reviewer.md')));
   assert.ok(fs.existsSync(path.join(s.project, 'docs', 'adr', '0000-template.md')));
   assert.ok(s.calls.some((c) => c.cmd.includes('astral.sh/uv')));
   assert.ok(s.lines.some((l) => l.startsWith('✗') && l.includes('uv')));
@@ -114,27 +134,28 @@ test('missing project dir → exit 2, nothing created', async () => {
   assert.ok(s.lines.some((l) => l.includes('does-not-exist')));
 });
 
-test('no TTY and no preset → minimal defaults with a notice', async () => {
+test('no TTY and no preset → global minimal defaults with a notice', async () => {
   const s = setup();
   assert.equal(await s.go(), 0);
   assert.ok(s.lines.some((l) => l.includes('minimal')));
-  assert.ok(fs.existsSync(path.join(s.project, 'CLAUDE.md')));
-  assert.ok(!fs.existsSync(path.join(s.project, '.claude', 'agents')));
+  assert.ok(fs.existsSync(path.join(s.home, '.claude', 'settings.json')));
+  assert.ok(!fs.existsSync(path.join(s.home, '.claude', 'agents')));
+  assert.deepEqual(walk(s.project), []);
 });
 
 test('interactive answers are respected; --without is not asked', async () => {
   const asked = [];
   const ask = async (q, def) => {
     asked.push(q);
-    return q.startsWith('agents') ? true : q.startsWith('context7') ? false : def;
+    return q.startsWith('adr') ? true : q.startsWith('project-settings') ? false : def;
   };
   const s = setup({ ask });
   assert.equal(await s.go('--project', '.', '--without', 'claude-md'), 0);
-  assert.ok(fs.existsSync(path.join(s.project, '.claude', 'agents', 'test-writer.md')));
-  assert.ok(!fs.existsSync(path.join(s.project, '.mcp.json')));
+  assert.ok(fs.existsSync(path.join(s.project, 'docs', 'adr', '0000-template.md')));
+  assert.ok(!fs.existsSync(path.join(s.project, '.claude', 'settings.json')));
   assert.ok(!fs.existsSync(path.join(s.project, 'CLAUDE.md')));
   assert.ok(!asked.some((q) => q.startsWith('claude-md')));
-  assert.ok(asked.some((q) => q.startsWith('serena') && q.endsWith('[y/N] ')));
+  assert.ok(asked.some((q) => q.startsWith('speckit-init') && q.endsWith('[y/N] ')));
 });
 
 test('--lang ru switches output language', async () => {
@@ -143,11 +164,14 @@ test('--lang ru switches output language', async () => {
   assert.ok(s.lines.some((l) => l.startsWith('Дальше')));
 });
 
-test('doctor command: exit 1 on a fresh project, 0 after minimal', async () => {
+test('doctor: global checks by default, repo checks with --project', async () => {
   const s = setup();
   assert.equal(await s.go('doctor'), 1);
   await s.go('--preset', 'minimal', '--yes');
   assert.equal(await s.go('doctor'), 0);
+  assert.equal(await s.go('doctor', '--project', '.'), 1, 'repo has no CLAUDE.md yet');
+  await s.go('--project', '.', '--preset', 'minimal', '--yes');
+  assert.equal(await s.go('doctor', '--project', '.'), 0);
 });
 
 test('CLI runs when invoked through a symlinked path (macOS /tmp, OneDrive, junctions)', { skip: process.platform === 'win32' }, () => {

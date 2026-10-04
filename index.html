@@ -274,16 +274,16 @@ claude          # інтерактивна сесія
         <h2>7. Spec-driven development: Spec Kit (<code>specify</code>)</h2>
         <p><a href="https://github.com/github/spec-kit" target="_blank" rel="noopener">GitHub Spec Kit</a> — спочатку специфікація, потім план, потім задачі, потім код. Для Claude це означає: менше вгадувань, менше переписувань, і артефакти, які можна рецензувати.</p>
         <div class="steps">
-          <div><b>/speckit.constitution</b><span>принципи проєкту (якість, тести, стек)</span></div>
-          <div><b>/speckit.specify</b><span>ЩО і НАВІЩО — без технологій</span></div>
-          <div><b>/speckit.clarify</b><span>закрити неоднозначності</span></div>
-          <div><b>/speckit.plan</b><span>ЯК — стек, архітектура, контракти</span></div>
-          <div><b>/speckit.tasks</b><span>розбивка на задачі</span></div>
-          <div><b>/speckit.implement</b><span>реалізація по задачах</span></div>
+          <div><b>/speckit-constitution</b><span>принципи проєкту (якість, тести, стек)</span></div>
+          <div><b>/speckit-specify</b><span>ЩО і НАВІЩО — без технологій</span></div>
+          <div><b>/speckit-clarify</b><span>закрити неоднозначності</span></div>
+          <div><b>/speckit-plan</b><span>ЯК — стек, архітектура, контракти</span></div>
+          <div><b>/speckit-tasks</b><span>розбивка на задачі</span></div>
+          <div><b>/speckit-implement</b><span>реалізація по задачах</span></div>
         </div>
-        <pre><code>specify init . --ai claude   # ініціалізувати в існуючому репо
+        <pre><code>specify init --here --integration claude   # ініціалізувати в існуючому репо
 specify check                # перевірити оточення</code></pre>
-        <p class="meta">Назви команд залежать від версії Spec Kit — дивіться, що створилося в <code>.claude/commands/</code>.</p>
+        <p class="meta">Нові версії Spec Kit ставлять команди як skills у <code>.claude/skills/</code> з дефісом (<code>/speckit-plan</code>); старі — у <code>.claude/commands/</code> з крапкою (<code>/speckit.plan</code>). Є також <code>/speckit-converge</code> — оцінити код і дописати залишок роботи в задачі.</p>
         <h3>Поради</h3>
         <ul>
           <li>Рецензуйте <code>spec.md</code> і <code>plan.md</code> у PR <b>до</b> реалізації — це найдешевше місце знайти помилку.</li>
@@ -442,11 +442,12 @@ report only real issues with file:line and a concrete fix. No style nitpicks.</c
       <!-- 13 -->
       <section id="autosetup" class="card">
         <h2>13. Автоналаштування (setup-kit)</h2>
-        <p>Усе з цього гайду можна застосувати однією командою. Скрипт нічого не перезаписує: наявні файли пропускає, JSON зливає, перед зміною робить <code>.bak</code>.</p>
+        <p>Усе з цього гайду можна застосувати однією командою. За замовчуванням налаштування <b>глобальні</b> — у <code>~/.claude</code>, для всіх сесій і проєктів; конкретний репозиторій налаштовується лише з <code>--project &lt;path&gt;</code>. Скрипт нічого не перезаписує: наявні файли пропускає, JSON зливає, перед зміною робить <code>.bak</code>.</p>
 <pre><code># macOS / Linux
 ./setup-kit/setup.sh --dry-run            # що буде змінено
-./setup-kit/setup.sh --preset minimal     # база: CLAUDE.md, дозволи, context7
-./setup-kit/setup.sh --preset full        # + agents, hooks, ADR, Serena, graphify, Spec Kit, engram
+./setup-kit/setup.sh --preset minimal     # глобально: Claude, deny для секретів, context7
+./setup-kit/setup.sh --preset full        # + правила в ~/.claude/CLAUDE.md, agents, Serena, graphify, Spec Kit, engram, statusline
+./setup-kit/setup.sh --project ~/code/app # каркас CLAUDE.md і дозволи для репозиторію
 ./setup-kit/setup.sh doctor               # перевірка
 
 # Windows (PowerShell, у т.ч. RDP)
@@ -454,13 +455,13 @@ powershell -ExecutionPolicy Bypass -File .\setup-kit\setup.ps1 --preset minimal<
         <table class="compare">
           <thead><tr><th>Прапорець</th><th>Що робить</th></tr></thead>
           <tbody>
-            <tr><td><code>--user</code> / <code>--project &lt;path&gt;</code></td><td>лише машина розробника / лише репозиторій</td></tr>
+            <tr><td>(без прапорців) / <code>--project &lt;path&gt;</code></td><td>глобально (<code>~/.claude</code>) / лише репозиторій; разом — <code>--user --project &lt;path&gt;</code></td></tr>
             <tr><td><code>--with a,b</code> / <code>--without c,d</code></td><td>додати / прибрати компоненти</td></tr>
             <tr><td><code>--yes</code></td><td>без запитань (для масового розгортання)</td></tr>
             <tr><td><code>--dry-run</code></td><td>показати diff, нічого не змінювати</td></tr>
           </tbody>
         </table>
-        <p class="tip">💡 Після запуску: <code>claude</code> → <code>/login</code> → <code>/status</code> → <code>/mcp</code>, потім закомітьте <code>CLAUDE.md</code>, <code>.claude/</code>, <code>.mcp.json</code>. Відредагуйте каркас <code>CLAUDE.md</code> під ваш проєкт.</p>
+        <p class="tip">💡 Після запуску: <code>claude</code> → <code>/login</code> → <code>/status</code> → <code>/mcp</code>, Для репозиторію: заповніть каркас <code>CLAUDE.md</code>, потім закомітьте <code>CLAUDE.md</code> і <code>.claude/</code>.</p>
         <p class="meta">Повний список компонентів — у <code>setup-kit/README.md</code>.</p>
       </section>
 

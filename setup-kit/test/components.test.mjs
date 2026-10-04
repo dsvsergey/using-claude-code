@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { COMPONENTS } from '../lib/components.mjs';
-import { PRESETS } from '../lib/presets.mjs';
+import { PRESETS, resolveSelection } from '../lib/presets.mjs';
 import { tmpDir } from './helpers.mjs';
 
 const templatesDir = fileURLToPath(new URL('../templates/', import.meta.url));
@@ -25,6 +25,10 @@ function ctxOf(o = {}) {
   };
 }
 
+const userMcp = (ctx, servers) => fs.writeFileSync(path.join(ctx.home, '.claude.json'), JSON.stringify({ mcpServers: servers }));
+
+// ── registry ──────────────────────────────────────────────────────────────
+
 test('registry: unique ids, valid presets, bilingual descriptions', () => {
   const ids = COMPONENTS.map((c) => c.id);
   assert.equal(new Set(ids).size, ids.length);
@@ -35,10 +39,25 @@ test('registry: unique ids, valid presets, bilingual descriptions', () => {
   }
 });
 
+test('registry: global components first, repo-only components last', () => {
+  const user = ['claude', 'user-settings', 'global-claude-md', 'statusline', 'ccusage', 'engram', 'agents', 'context7', 'serena', 'graphify', 'speckit'];
+  const project = ['claude-md', 'project-settings', 'adr', 'format-hook', 'speckit-init'];
+  assert.deepEqual(COMPONENTS.map((c) => c.id), [...user, ...project]);
+  assert.ok(COMPONENTS.slice(0, user.length).every((c) => c.scope === 'user'));
+  assert.ok(COMPONENTS.slice(user.length).every((c) => c.scope === 'project'));
+});
+
+test('minimal preset', () => {
+  assert.deepEqual(resolveSelection(COMPONENTS, { preset: 'minimal', scopes: ['user'] }), ['claude', 'user-settings', 'context7']);
+  assert.deepEqual(resolveSelection(COMPONENTS, { preset: 'minimal', scopes: ['project'] }), ['claude-md', 'project-settings']);
+});
+
 test('every component plans without throwing and only references existing templates', () => {
   const ctx = ctxOf();
   for (const c of COMPONENTS) assert.ok(Array.isArray(c.plan(ctx)), c.id);
 });
+
+// ── global (user scope) ───────────────────────────────────────────────────
 
 test('user-settings merges deny rules into ~/.claude/settings.json', () => {
   const ctx = ctxOf();
@@ -49,45 +68,66 @@ test('user-settings merges deny rules into ~/.claude/settings.json', () => {
   assert.ok(!JSON.stringify(a.template).includes('bypassPermissions'));
 });
 
-test('claude-md creates CLAUDE.md and ignores personal files', () => {
+test('global-claude-md appends a marked block to ~/.claude/CLAUDE.md (full only)', () => {
   const ctx = ctxOf();
-  const [md, gi] = byId('claude-md').plan(ctx);
-  assert.equal(md.target, path.join(ctx.project, 'CLAUDE.md'));
-  assert.match(md.content, /## Commands/);
-  assert.deepEqual(gi, { type: 'lines', target: path.join(ctx.project, '.gitignore'), lines: ['CLAUDE.local.md', '.claude/settings.local.json'] });
+  const [a] = byId('global-claude-md').plan(ctx);
+  assert.equal(a.type, 'block');
+  assert.equal(a.target, path.join(ctx.home, '.claude', 'CLAUDE.md'));
+  assert.equal(a.marker, 'setup-kit');
+  assert.match(a.content, /^<!-- setup-kit:start -->/);
+  assert.match(a.content, /graphify query/);
+  assert.deepEqual(byId('global-claude-md').presets, ['full']);
 });
 
-test('project-settings denies git push; context7 is an http MCP server', () => {
-  const ctx = ctxOf();
-  assert.ok(byId('project-settings').plan(ctx)[0].template.permissions.deny.includes('Bash(git push:*)'));
-  const [mcp] = byId('context7').plan(ctx);
-  assert.equal(mcp.target, path.join(ctx.project, '.mcp.json'));
-  assert.deepEqual(mcp.template.mcpServers.context7, { type: 'http', url: 'https://mcp.context7.com/mcp' });
-});
-
-test('format-hook: skipped without prettier, planned with prettier devDependency', () => {
-  const ctx = ctxOf();
-  assert.equal(byId('format-hook').plan(ctx)[0].type, 'skip');
-  fs.writeFileSync(path.join(ctx.project, 'package.json'), JSON.stringify({ devDependencies: { prettier: '^3' } }));
-  const actions = byId('format-hook').plan(ctx);
-  assert.deepEqual(actions.map((a) => a.type), ['file', 'json']);
-  assert.equal(actions[0].target, path.join(ctx.project, '.claude', 'hooks', 'format.mjs'));
-  assert.equal(actions[1].template.hooks.PostToolUse[0].matcher, 'Edit|Write');
-});
-
-test('format-hook: broken package.json is treated as no prettier', () => {
-  const ctx = ctxOf();
-  fs.writeFileSync(path.join(ctx.project, 'package.json'), '{ nope');
-  assert.equal(byId('format-hook').plan(ctx)[0].type, 'skip');
-});
-
-test('agents and adr copy their templates', () => {
+test('agents install globally into ~/.claude', () => {
   const ctx = ctxOf();
   assert.deepEqual(
-    byId('agents').plan(ctx).map((a) => path.relative(ctx.project, a.target)),
+    byId('agents').plan(ctx).map((a) => path.relative(ctx.home, a.target)),
     [path.join('.claude', 'agents', 'code-reviewer.md'), path.join('.claude', 'agents', 'test-writer.md'), path.join('.claude', 'commands', 'review-pr.md')],
   );
-  assert.equal(byId('adr').plan(ctx)[0].target, path.join(ctx.project, 'docs', 'adr', '0000-template.md'));
+});
+
+test('context7: user-scope MCP via claude mcp add; skipped when already registered', () => {
+  const ctx = ctxOf();
+  const actions = byId('context7').plan(ctx);
+  assert.deepEqual(actions[0], { type: 'require', tool: 'claude', hint: 'install the claude component first' });
+  assert.equal(actions[1].command, 'claude mcp add --scope user --transport http context7 https://mcp.context7.com/mcp');
+  userMcp(ctx, { context7: { type: 'http' } });
+  assert.deepEqual(byId('context7').plan(ctx).map((a) => a.type), ['skip']);
+});
+
+test('serena: requires uv, registers a user-scope MCP that follows the cwd; skipped when registered', () => {
+  const ctx = ctxOf();
+  const [uv, claude, add] = byId('serena').plan(ctx);
+  assert.deepEqual(uv, { type: 'require', tool: 'uv', install: 'curl -LsSf https://astral.sh/uv/install.sh | sh' });
+  assert.equal(claude.tool, 'claude');
+  assert.equal(
+    add.command,
+    'claude mcp add --scope user serena -- uvx --from git+https://github.com/oraios/serena serena start-mcp-server --context claude-code --project-from-cwd',
+  );
+  assert.match(byId('serena').plan(ctxOf({ platform: 'win32' }))[0].install, /irm https:\/\/astral\.sh\/uv\/install\.ps1 \| iex/);
+  userMcp(ctx, { serena: { command: 'uvx' } });
+  assert.deepEqual(byId('serena').plan(ctx).map((a) => a.type), ['skip']);
+});
+
+test('graphify: global CLI + skill only, never builds a graph', () => {
+  const ctx = ctxOf({ run: { which: (c) => (c === 'uv' ? '/bin/uv' : null) } });
+  const actions = byId('graphify').plan(ctx);
+  assert.deepEqual(actions.map((a) => a.command ?? a.type), ['require', 'uv tool install graphifyy', 'graphify install']);
+  assert.ok(actions.every((a) => !a.cwd));
+  const done = ctxOf();
+  fs.mkdirSync(path.join(done.home, '.claude', 'skills', 'graphify'), { recursive: true });
+  fs.writeFileSync(path.join(done.home, '.claude', 'skills', 'graphify', 'SKILL.md'), '');
+  assert.deepEqual(byId('graphify').plan(done).map((a) => a.type), ['skip']);
+});
+
+test('speckit: installs the specify CLI globally, skipped when present', () => {
+  const ctx = ctxOf({ run: { which: (c) => (c === 'uv' ? '/bin/uv' : null) } });
+  assert.deepEqual(byId('speckit').plan(ctx).map((a) => a.command ?? a.type), [
+    'require',
+    'uv tool install specify-cli --from git+https://github.com/github/spec-kit.git',
+  ]);
+  assert.deepEqual(byId('speckit').plan(ctxOf()).map((a) => a.type), ['skip']);
 });
 
 test('statusline uses ccstatusline; ccusage needs npx', () => {
@@ -95,13 +135,6 @@ test('statusline uses ccstatusline; ccusage needs npx', () => {
   assert.equal(byId('statusline').plan(ctx)[0].template.statusLine.command, 'npx -y ccstatusline@latest');
   assert.equal(byId('ccusage').plan(ctx)[0].type, 'note');
   assert.equal(byId('ccusage').plan(ctxOf({ run: { which: () => null } }))[0].type, 'fail');
-});
-
-test('registry order: user components first, then project', () => {
-  assert.deepEqual(COMPONENTS.map((c) => c.id), [
-    'claude', 'user-settings', 'statusline', 'ccusage', 'engram',
-    'claude-md', 'project-settings', 'context7', 'format-hook', 'agents', 'adr', 'serena', 'graphify', 'speckit',
-  ]);
 });
 
 test('claude: already installed on macOS → skip', () => {
@@ -114,7 +147,7 @@ test('claude: missing on Unix → official install.sh', () => {
   assert.equal(a.confirm, true);
 });
 
-test('claude: Windows without .local\\bin in user PATH → install + PATH fix', () => {
+test('claude: Windows without .local\\bin in user PATH → install + PATH fix + note', () => {
   const ctx = ctxOf({ platform: 'win32', home: 'C:\\Users\\Ivan Petrenko', run: { which: () => null, capture: () => ({ code: 0, stdout: 'C:\\Tools;\r\n' }) } });
   const actions = byId('claude').plan(ctx);
   assert.equal(actions.length, 3);
@@ -138,7 +171,7 @@ test('claude: Windows user PATH with unexpanded %USERPROFILE%\\.local\\bin count
 });
 
 test('claude: Windows with .local\\bin already in user PATH → no PATH fix', () => {
-  const ctx = ctxOf({ platform: 'win32', home: 'C:\\Users\\ivan', run: { which: () => 'C:\\x\\claude.exe', capture: () => ({ code: 0, stdout: 'C:\\Users\\ivan\\.local\\bin\;C:\\Tools\r\n' }) } });
+  const ctx = ctxOf({ platform: 'win32', home: 'C:\\Users\\ivan', run: { which: () => 'C:\\x\\claude.exe', capture: () => ({ code: 0, stdout: 'C:\\Users\\ivan\\.local\\bin\\;C:\\Tools\r\n' }) } });
   assert.deepEqual(byId('claude').plan(ctx).map((a) => a.type), ['skip']);
 });
 
@@ -165,28 +198,61 @@ test('engram: go fallback; neither brew nor go → fail with install link', () =
   assert.match(none[0].reason, /INSTALLATION\.md/);
 });
 
-test('serena: requires uv (official installer) and adds the MCP server', () => {
+// ── repository (project scope) ────────────────────────────────────────────
+
+test('claude-md: skeleton + reminder to fill it in; ignores personal files and backups', () => {
   const ctx = ctxOf();
-  const [req, mcp] = byId('serena').plan(ctx);
-  assert.deepEqual(req, { type: 'require', tool: 'uv', install: 'curl -LsSf https://astral.sh/uv/install.sh | sh' });
-  assert.ok(mcp.template.mcpServers.serena.args.includes('--project-from-cwd'));
-  const [winReq] = byId('serena').plan(ctxOf({ platform: 'win32' }));
-  assert.match(winReq.install, /irm https:\/\/astral\.sh\/uv\/install\.ps1 \| iex/);
+  const [md, note, gi] = byId('claude-md').plan(ctx);
+  assert.equal(md.target, path.join(ctx.project, 'CLAUDE.md'));
+  assert.match(md.content, /## Commands/);
+  assert.equal(note.type, 'note');
+  assert.match(note.text, /CLAUDE\.md/);
+  assert.deepEqual(gi, { type: 'lines', target: path.join(ctx.project, '.gitignore'), lines: ['CLAUDE.local.md', '.claude/settings.local.json', '*.bak-*'] });
+  fs.writeFileSync(path.join(ctx.project, 'CLAUDE.md'), '# mine\n');
+  assert.deepEqual(byId('claude-md').plan(ctx).map((a) => a.type), ['file', 'lines']);
 });
 
-test('graphify: installs via uv tool when missing, builds graph in project cwd', () => {
-  const ctx = ctxOf({ run: { which: (c) => (c === 'uv' ? '/bin/uv' : null) } });
-  const actions = byId('graphify').plan(ctx);
-  assert.deepEqual(actions.map((a) => a.command ?? a.type), ['require', 'uv tool install graphifyy', 'graphify install', 'graphify update .']);
-  assert.equal(actions[3].cwd, ctx.project);
+test('project-settings denies git push', () => {
+  const ctx = ctxOf();
+  const [a] = byId('project-settings').plan(ctx);
+  assert.equal(a.target, path.join(ctx.project, '.claude', 'settings.json'));
+  assert.ok(a.template.permissions.deny.includes('Bash(git push:*)'));
 });
 
-test('speckit: skipped when .specify exists; --force only with --yes', () => {
+test('adr copies the template into the repo', () => {
   const ctx = ctxOf();
-  const [, init] = byId('speckit').plan(ctx);
-  assert.equal(init.command, 'uvx --from git+https://github.com/github/spec-kit.git specify init --here --integration claude');
+  assert.equal(byId('adr').plan(ctx)[0].target, path.join(ctx.project, 'docs', 'adr', '0000-template.md'));
+});
+
+test('format-hook: skipped without prettier, planned with prettier devDependency', () => {
+  const ctx = ctxOf();
+  assert.equal(byId('format-hook').plan(ctx)[0].type, 'skip');
+  fs.writeFileSync(path.join(ctx.project, 'package.json'), JSON.stringify({ devDependencies: { prettier: '^3' } }));
+  const actions = byId('format-hook').plan(ctx);
+  assert.deepEqual(actions.map((a) => a.type), ['file', 'json']);
+  assert.equal(actions[0].target, path.join(ctx.project, '.claude', 'hooks', 'format.mjs'));
+  assert.equal(actions[1].template.hooks.PostToolUse[0].matcher, 'Edit|Write');
+});
+
+test('format-hook: broken package.json is treated as no prettier', () => {
+  const ctx = ctxOf();
+  fs.writeFileSync(path.join(ctx.project, 'package.json'), '{ nope');
+  assert.equal(byId('format-hook').plan(ctx)[0].type, 'skip');
+});
+
+test('speckit-init: script type by platform, never --force', () => {
+  const ctx = ctxOf({ yes: true });
+  const [, init] = byId('speckit-init').plan(ctx);
+  assert.equal(init.command, 'uvx --from git+https://github.com/github/spec-kit.git specify init --here --integration claude --script sh');
   assert.equal(init.cwd, ctx.project);
-  assert.match(byId('speckit').plan({ ...ctx, yes: true })[1].command, / --force$/);
+  assert.match(byId('speckit-init').plan(ctxOf({ platform: 'win32' }))[1].command, / --script ps$/);
+});
+
+test('speckit-init: skipped when .specify exists, or with --yes in a non-empty repo (it could overwrite files)', () => {
+  const ctx = ctxOf();
+  fs.writeFileSync(path.join(ctx.project, 'README.md'), 'x');
+  assert.equal(byId('speckit-init').plan(ctx)[1].type, 'exec', 'interactive run may proceed: spec-kit asks before merging');
+  assert.deepEqual(byId('speckit-init').plan({ ...ctx, yes: true }).map((a) => a.type), ['skip']);
   fs.mkdirSync(path.join(ctx.project, '.specify'));
-  assert.deepEqual(byId('speckit').plan(ctx).map((a) => a.type), ['skip']);
+  assert.deepEqual(byId('speckit-init').plan(ctx).map((a) => a.type), ['skip']);
 });

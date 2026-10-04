@@ -23,7 +23,7 @@ test('healthy setup: all checks pass, nothing written', () => {
     mcp: JSON.stringify({ mcpServers: { serena: { command: 'uvx' }, context7: { type: 'http', url: 'https://mcp.context7.com/mcp' } } }),
   });
   const before = [...walk(s.home), ...walk(s.project)];
-  const checks = runDoctor({ ...s, run: { which: (c) => `/bin/${c}` } });
+  const checks = runDoctor({ ...s, checkProject: true, run: { which: (c) => `/bin/${c}` } });
   assert.ok(checks.every((c) => c.ok), JSON.stringify(checks.filter((c) => !c.ok)));
   assert.ok(checks.some((c) => c.label === 'MCP serena: uvx in PATH'));
   assert.deepEqual([...walk(s.home), ...walk(s.project)], before);
@@ -31,10 +31,18 @@ test('healthy setup: all checks pass, nothing written', () => {
 
 test('problems are reported', () => {
   const s = setup({ userSettings: '{ broken', mcp: JSON.stringify({ mcpServers: { serena: { command: 'uvx' } } }), claudeMd: false });
-  const failed = runDoctor({ ...s, run: { which: () => null } }).filter((c) => !c.ok).map((c) => c.label);
+  const failed = runDoctor({ ...s, checkProject: true, run: { which: () => null } }).filter((c) => !c.ok).map((c) => c.label);
   assert.ok(failed.includes('claude in PATH'));
   assert.ok(failed.some((l) => l.startsWith('valid JSON:') && l.endsWith('settings.json')));
   assert.ok(failed.includes('Read(./.env) in permissions.deny'));
   assert.ok(failed.includes('CLAUDE.md in project'));
   assert.ok(failed.includes('MCP serena: uvx in PATH'));
+});
+
+test('global mode: no repo checks; user-scope MCP servers from ~/.claude.json are checked', () => {
+  const s = setup({ userSettings: JSON.stringify({ permissions: { deny: ['Read(./.env)'] } }), claudeMd: false });
+  fs.writeFileSync(path.join(s.home, '.claude.json'), JSON.stringify({ mcpServers: { serena: { command: 'uvx' }, context7: { type: 'http' } } }));
+  const checks = runDoctor({ ...s, checkProject: false, run: { which: (c) => (c === 'claude' ? '/bin/claude' : null) } });
+  assert.ok(!checks.some((c) => c.label === 'CLAUDE.md in project'));
+  assert.deepEqual(checks.filter((c) => !c.ok).map((c) => c.label), ['MCP serena: uvx in PATH']);
 });

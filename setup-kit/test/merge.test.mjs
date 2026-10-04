@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeJson, parseJson, appendLines } from '../lib/merge.mjs';
+import { mergeJson, parseJson, appendLines, appendBlock } from '../lib/merge.mjs';
 
 test('arrays: union without duplicates, user order first', () => {
   const { result, added } = mergeJson({ permissions: { allow: ['b', 'a'] } }, { permissions: { allow: ['a', 'c'] } });
@@ -100,4 +100,13 @@ test('appendLines: CRLF file recognizes existing lines', () => {
 
 test('appendLines: empty file', () => {
   assert.deepEqual(appendLines('', ['a', 'b']), { text: 'a\nb\n', added: 2 });
+});
+
+test('appendBlock: appended once after a blank line, never duplicated', () => {
+  const block = '<!-- setup-kit:start -->\nX\n<!-- setup-kit:end -->\n';
+  assert.deepEqual(appendBlock('', 'setup-kit', block), { text: block, added: true });
+  const once = appendBlock('# mine\n', 'setup-kit', block);
+  assert.deepEqual(once, { text: '# mine\n\n' + block, added: true });
+  assert.deepEqual(appendBlock(once.text, 'setup-kit', block), { text: once.text, added: false });
+  assert.equal(appendBlock('# mine', 'setup-kit', block).text, '# mine\n\n' + block);
 });
