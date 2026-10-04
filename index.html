@@ -34,6 +34,7 @@
       <a href="#practices">10. Кращі практики</a>
       <a href="#cheatsheet">11. Шпаргалка команд</a>
       <a href="#onboarding">12. Чекліст онбордингу</a>
+      <a href="#autosetup">13. Автоналаштування</a>
     </nav>
 
     <main id="top">
@@ -436,6 +437,31 @@ report only real issues with file:line and a concrete fix. No style nitpicks.</c
           <li><label><input type="checkbox"> Секрети закриті в <code>permissions.deny</code></label></li>
         </ul>
         <p class="meta">Стан чекліста зберігається локально у вашому браузері.</p>
+      </section>
+
+      <!-- 13 -->
+      <section id="autosetup" class="card">
+        <h2>13. Автоналаштування (setup-kit)</h2>
+        <p>Усе з цього гайду можна застосувати однією командою. Скрипт нічого не перезаписує: наявні файли пропускає, JSON зливає, перед зміною робить <code>.bak</code>.</p>
+<pre><code># macOS / Linux
+./setup-kit/setup.sh --dry-run            # що буде змінено
+./setup-kit/setup.sh --preset minimal     # база: CLAUDE.md, дозволи, context7
+./setup-kit/setup.sh --preset full        # + agents, hooks, ADR, Serena, graphify, Spec Kit, engram
+./setup-kit/setup.sh doctor               # перевірка
+
+# Windows (PowerShell, у т.ч. RDP)
+powershell -ExecutionPolicy Bypass -File .\setup-kit\setup.ps1 --preset minimal</code></pre>
+        <table class="compare">
+          <thead><tr><th>Прапорець</th><th>Що робить</th></tr></thead>
+          <tbody>
+            <tr><td><code>--user</code> / <code>--project &lt;path&gt;</code></td><td>лише машина розробника / лише репозиторій</td></tr>
+            <tr><td><code>--with a,b</code> / <code>--without c,d</code></td><td>додати / прибрати компоненти</td></tr>
+            <tr><td><code>--yes</code></td><td>без запитань (для масового розгортання)</td></tr>
+            <tr><td><code>--dry-run</code></td><td>показати diff, нічого не змінювати</td></tr>
+          </tbody>
+        </table>
+        <p class="tip">💡 Після запуску: <code>claude</code> → <code>/login</code> → <code>/status</code> → <code>/mcp</code>, потім закомітьте <code>CLAUDE.md</code>, <code>.claude/</code>, <code>.mcp.json</code>. Відредагуйте каркас <code>CLAUDE.md</code> під ваш проєкт.</p>
+        <p class="meta">Повний список компонентів — у <code>setup-kit/README.md</code>.</p>
       </section>
 
       <footer>
