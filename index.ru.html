@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Claude Code для команды — практическое руководство</title>
+  <meta name="description" content="Настройка, база знаний, экономия токенов и лучшие практики работы с Claude Code для команды разработчиков.">
+  <link rel="alternate" hreflang="uk" href="index.html">
+  <script src="lang.js"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#top">⌘ Claude Code <span>для команды</span></a>
+    <input id="search" type="search" placeholder="Поиск по руководству…  ( / )" aria-label="Поиск">
+    <nav class="lang" aria-label="Язык">
+      <a href="index.html" data-lang="uk" hreflang="uk">UK</a>
+      <a href="index.ru.html" data-lang="ru" class="active" aria-current="page">RU</a>
+    </nav>
+    <button id="theme" aria-label="Переключить тему">◐</button>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" id="toc">
+      <a href="#start">1. Быстрый старт</a>
+      <a href="#claude-md">2. CLAUDE.md — память проекта</a>
+      <a href="#settings">3. settings.json и разрешения</a>
+      <a href="#team">4. Общая конфигурация команды</a>
+      <a href="#tokens">5. Экономия токенов и контекста</a>
+      <a href="#kb">6. Локальная база знаний (тулы)</a>
+      <a href="#sdd">7. Spec-driven: Spec Kit (specify)</a>
+      <a href="#workflow">8. Рабочий цикл задачи</a>
+      <a href="#extend">9. Skills, subagents, hooks, MCP</a>
+      <a href="#practices">10. Лучшие практики</a>
+      <a href="#cheatsheet">11. Шпаргалка команд</a>
+      <a href="#onboarding">12. Чеклист онбординга</a>
+    </nav>
+
+    <main id="top">
+      <section class="hero">
+        <h1>Claude Code для команды</h1>
+        <p>Короткое практическое руководство: как настроить, как не сжигать токены, как хранить знания о проекте локально и как работать так, чтобы результат был предсказуемым.</p>
+        <div class="pills">
+          <span>⚙️ настройка</span><span>🧠 база знаний</span><span>💸 токены</span><span>📐 spec-driven</span><span>✅ практики</span>
+        </div>
+      </section>
+
+      <!-- 1 -->
+      <section id="start" class="card">
+        <h2>1. Быстрый старт</h2>
+        <ol>
+          <li>Установите Claude Code (см. официальную документацию — <a href="https://docs.claude.com/en/docs/claude-code/overview" target="_blank" rel="noopener">docs.claude.com</a>).</li>
+          <li>Откройте терминал в корне репозитория и запустите <code>claude</code>.</li>
+          <li>Выполните <code>/init</code> — Claude проанализирует код и создаст стартовый <code>CLAUDE.md</code>. <b>Отредактируйте его вручную</b>: убрать воду, добавить то, чего не видно из кода.</li>
+          <li>Закоммитьте <code>CLAUDE.md</code>, <code>.claude/settings.json</code> и <code>.mcp.json</code> — тогда вся команда стартует с одинаковой конфигурацией.</li>
+        </ol>
+        <pre><code>cd my-repo
+claude          # интерактивная сессия
+/init           # сгенерировать CLAUDE.md
+/status         # проверить модель, аккаунт, настройки</code></pre>
+      </section>
+
+      <!-- 2 -->
+      <section id="claude-md" class="card">
+        <h2>2. CLAUDE.md — память проекта</h2>
+        <p><code>CLAUDE.md</code> загружается в контекст <b>каждой</b> сессии. Поэтому он должен быть коротким и плотным: каждая строка стоит токенов в каждом запросе.</p>
+        <div class="grid2">
+          <div>
+            <h3>Где лежит</h3>
+            <table>
+              <tr><td><code>~/.claude/CLAUDE.md</code></td><td>личные правила для всех проектов</td></tr>
+              <tr><td><code>./CLAUDE.md</code></td><td>правила проекта, в git, для всей команды</td></tr>
+              <tr><td><code>./CLAUDE.local.md</code></td><td>личные правила для проекта (в <code>.gitignore</code>)</td></tr>
+              <tr><td><code>./subdir/CLAUDE.md</code></td><td>подгружается, когда Claude работает в этой папке</td></tr>
+            </table>
+          </div>
+          <div>
+            <h3>Что писать</h3>
+            <ul>
+              <li>Команды: build, test, lint, запуск одного теста.</li>
+              <li>Архитектурные границы: «UI не ходит напрямую в БД».</li>
+              <li>Конвенции, которые не видны из кода.</li>
+              <li>Ловушки: «миграции только через …», «не трогать <code>legacy/</code>».</li>
+              <li>Ссылки на подробные документы через <code>@docs/file.md</code> вместо копирования текста.</li>
+            </ul>
+            <h3>Чего не писать</h3>
+            <ul>
+              <li>Описание структуры папок, которое Claude и так видит.</li>
+              <li>Общие советы («пиши чистый код»).</li>
+              <li>Секреты, токены, пароли.</li>
+            </ul>
+          </div>
+        </div>
+        <details>
+          <summary>Пример CLAUDE.md</summary>
+<pre><code># Project: billing-api
+
+## Commands
+- Install: `pnpm i`
+- Test all: `pnpm test` · one file: `pnpm vitest run path/to/file.test.ts`
+- Lint+types: `pnpm lint && pnpm typecheck` (run before saying "done")
+
+## Architecture
+- `src/domain` — pure logic, no IO. `src/infra` — DB/HTTP adapters.
+- All DB access via repositories in `src/infra/repos`. Never import prisma elsewhere.
+
+## Conventions
+- Errors: return `Result&lt;T, AppError&gt;`, never throw in domain.
+- New endpoint = handler + zod schema + test in `tests/api`.
+
+## Gotchas
+- Money is integer cents. Never use float.
+- `legacy/` is frozen — do not modify.
+
+## More docs
+- @docs/architecture.md
+- @docs/release-process.md</code></pre>
+        </details>
+        <p class="tip">💡 Совет: во время работы говорите «добавь это в CLAUDE.md», когда Claude ошибся из-за незнания конвенции. Так файл растёт из реальных проблем, а не из выдуманных правил. Раз в месяц чистите его.</p>
+      </section>
+
+      <!-- 3 -->
+      <section id="settings" class="card">
+        <h2>3. settings.json и разрешения</h2>
+        <table>
+          <tr><td><code>~/.claude/settings.json</code></td><td>пользовательские настройки</td></tr>
+          <tr><td><code>.claude/settings.json</code></td><td>проектные, в git — общие для команды</td></tr>
+          <tr><td><code>.claude/settings.local.json</code></td><td>личные для проекта, не коммитятся</td></tr>
+        </table>
+        <p>Разрешения убирают постоянные запросы «Allow?» для безопасных команд и запрещают опасные. Управлять можно командой <code>/permissions</code> или вручную:</p>
+<pre><code>{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm test:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Bash(git push:*)",
+      "Bash(rm -rf:*)"
+    ]
+  }
+}</code></pre>
+        <p class="warn">⚠️ Не включайте режим «пропускать все разрешения» на рабочей машине с доступом к прод-секретам. Если нужна полная автономия — запускайте в контейнере / devcontainer.</p>
+      </section>
+
+      <!-- 4 -->
+      <section id="team" class="card">
+        <h2>4. Общая конфигурация команды</h2>
+        <p>Идея: всё, что делает Claude «умным» в вашем проекте, лежит в репозитории и проходит code review, как обычный код.</p>
+<pre><code>repo/
+├── CLAUDE.md                 # правила проекта
+├── .mcp.json                 # общие MCP-серверы (без секретов!)
+├── .claude/
+│   ├── settings.json         # разрешения, hooks
+│   ├── commands/             # собственные /slash-команды команды
+│   │   └── review-pr.md
+│   ├── agents/               # специализированные subagents
+│   │   └── test-writer.md
+│   └── skills/               # skills с инструкциями и скриптами
+│       └── release/SKILL.md
+├── docs/                     # подробная документация, на которую ссылается CLAUDE.md
+└── specs/                    # спецификации (Spec Kit)</code></pre>
+        <ul>
+          <li>Секреты для MCP — через переменные окружения (<code>${API_KEY}</code> в <code>.mcp.json</code>), а не в файле.</li>
+          <li>Изменения в <code>CLAUDE.md</code> и <code>.claude/</code> — через PR, как и код.</li>
+          <li>Для набора общих инструментов между репозиториями — оформите <b>plugin</b> и внутренний marketplace (<code>/plugin</code>).</li>
+        </ul>
+      </section>
+
+      <!-- 5 -->
+      <section id="tokens" class="card">
+        <h2>5. Экономия токенов и контекста</h2>
+        <p>Главное правило: <b>контекст — самый дорогой ресурс</b>. Чем он больше и «грязнее», тем дороже и хуже работает модель.</p>
+        <div class="grid2">
+          <div>
+            <h3>Привычки</h3>
+            <ul>
+              <li><code>/clear</code> между независимыми задачами. Одна сессия = одна задача.</li>
+              <li><code>/compact</code> с подсказкой, что сохранить: <code>/compact оставь план и список изменённых файлов</code>.</li>
+              <li><code>/context</code> — посмотреть, что занимает контекст (MCP-тулы, файлы памяти и т.д.).</li>
+              <li>Давайте точные пути: <code>@src/billing/invoice.ts</code> вместо «найди, где счета».</li>
+              <li>Большие исследования («пройдись по всему репо») — через subagent: он читает файлы в своём контексте и возвращает только вывод.</li>
+              <li>Отключайте MCP-серверы, которые не нужны в этом проекте — описание каждого тула занимает контекст.</li>
+              <li>Не вставляйте огромные логи — давайте хвост или фильтр (<code>| tail -50</code>, <code>grep ERROR</code>).</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Выбор модели</h3>
+            <ul>
+              <li><code>/model</code> — переключение. Мощная модель — для планирования и сложных задач, более быстрая/дешёвая — для рутины.</li>
+              <li>Для subagents можно задать отдельную, более дешёвую модель в их frontmatter.</li>
+            </ul>
+            <h3>Измерение</h3>
+            <ul>
+              <li><code>/cost</code> или <code>/usage</code> — расходы текущей сессии / лимиты.</li>
+              <li><a href="https://github.com/ryoppippi/ccusage" target="_blank" rel="noopener">ccusage</a> — анализ локальных логов Claude Code: расходы по дням и сессиям.</li>
+              <li>Statusline (<code>/statusline</code>) — показывать заполненность контекста прямо в терминале.</li>
+            </ul>
+          </div>
+        </div>
+        <p class="tip">💡 Локальная база знаний экономит токены не «магически», а потому, что Claude получает <b>маленький точный фрагмент</b> (узел графа, заметку, сигнатуру функции) вместо чтения десятков файлов. Эффект максимален на больших репозиториях и повторяющихся вопросах.</p>
+      </section>
+
+      <!-- 6 -->
+      <section id="kb" class="card">
+        <h2>6. Локальная база знаний: тулы</h2>
+        <p>Три разные задачи — три типа инструментов. Не ставьте всё сразу: начните с 1–2 и посмотрите на <code>/context</code> и <code>/cost</code>.</p>
+
+        <h3>Карта кода (что где лежит и как связано)</h3>
+        <div class="tools">
+          <article>
+            <h4>graphify</h4>
+            <p>Строит граф знаний (код, документы) в <code>graphify-out/</code>. Запросы <code>graphify query</code>, <code>path</code>, <code>explain</code> возвращают маленький подграф вместо сырого grep.</p>
+            <p class="meta">Когда: большой/незнакомый репозиторий, вопросы об архитектуре. После изменений — <code>graphify update .</code></p>
+          </article>
+          <article>
+            <h4>Serena (MCP)</h4>
+            <p>Семантическая навигация по коду через LSP: найти символ, ссылки, редактировать на уровне функций — без чтения целых файлов.</p>
+            <p class="meta">Когда: типизированные языки, большие файлы, рефакторинг.</p>
+          </article>
+        </div>
+
+        <h3>Память между сессиями (решения, баги, договорённости)</h3>
+        <div class="tools">
+          <article>
+            <h4>Встроенная память: CLAUDE.md</h4>
+            <p>Самый простой и прозрачный вариант: текст в git, виден в review. <code>/memory</code> — открыть для редактирования.</p>
+            <p class="meta">Когда: всегда. Это база.</p>
+          </article>
+          <article>
+            <h4>engram (MCP)</h4>
+            <p>Локальная память (SQLite + поиск): Claude сохраняет решения, причины багов, конвенции и ищет их в следующих сессиях.</p>
+            <p class="meta">Когда: долгие проекты, много сессий. Минус: память личная, не в git — важное переносите в CLAUDE.md/docs.</p>
+          </article>
+          <article>
+            <h4>docs/ + ADR в репозитории</h4>
+            <p>Architecture Decision Records в <code>docs/adr/</code>, на которые ссылается CLAUDE.md через <code>@</code>. Общие для людей и для Claude.</p>
+            <p class="meta">Когда: командные решения, которые должны пережить людей.</p>
+          </article>
+        </div>
+
+        <h3>Актуальная документация библиотек</h3>
+        <div class="tools">
+          <article>
+            <h4>Context7 (MCP)</h4>
+            <p>Подтягивает свежую документацию конкретной версии библиотеки вместо «памяти» модели. Меньше выдуманных API — меньше итераций исправлений.</p>
+            <p class="meta">Когда: быстро меняющиеся фреймворки.</p>
+          </article>
+        </div>
+
+        <details>
+          <summary>Пример общего .mcp.json</summary>
+<pre><code>{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
+    }
+  }
+}</code></pre>
+          <p>Проверяйте актуальные команды установки в README каждого инструмента. Добавить сервер можно и командой <code>claude mcp add</code>; посмотреть состояние — <code>/mcp</code>.</p>
+        </details>
+      </section>
+
+      <!-- 7 -->
+      <section id="sdd" class="card">
+        <h2>7. Spec-driven development: Spec Kit (<code>specify</code>)</h2>
+        <p><a href="https://github.com/github/spec-kit" target="_blank" rel="noopener">GitHub Spec Kit</a> — сначала спецификация, потом план, потом задачи, потом код. Для Claude это значит: меньше угадываний, меньше переписываний и артефакты, которые можно ревьюить.</p>
+        <div class="steps">
+          <div><b>/speckit.constitution</b><span>принципы проекта (качество, тесты, стек)</span></div>
+          <div><b>/speckit.specify</b><span>ЧТО и ЗАЧЕМ — без технологий</span></div>
+          <div><b>/speckit.clarify</b><span>закрыть неоднозначности</span></div>
+          <div><b>/speckit.plan</b><span>КАК — стек, архитектура, контракты</span></div>
+          <div><b>/speckit.tasks</b><span>разбивка на задачи</span></div>
+          <div><b>/speckit.implement</b><span>реализация по задачам</span></div>
+        </div>
+        <pre><code>specify init . --ai claude   # инициализировать в существующем репо
+specify check                # проверить окружение</code></pre>
+        <p class="meta">Названия команд зависят от версии Spec Kit — смотрите, что создалось в <code>.claude/commands/</code>.</p>
+        <h3>Советы</h3>
+        <ul>
+          <li>Ревьюйте <code>spec.md</code> и <code>plan.md</code> в PR <b>до</b> реализации — это самое дешёвое место найти ошибку.</li>
+          <li>Не используйте для мелких фиксов — overhead больше пользы.</li>
+          <li>Между этапами делайте <code>/clear</code>: артефакты лежат в файлах, контекст можно не тянуть.</li>
+        </ul>
+        <h3>Альтернативы / дополнения</h3>
+        <ul>
+          <li><b>Plan mode</b> (Shift+Tab) — встроенный «лёгкий» вариант: Claude исследует и предлагает план, ничего не меняя.</li>
+          <li><b><a href="https://github.com/obra/superpowers" target="_blank" rel="noopener">Superpowers</a></b> (plugin) — набор skills для дисциплины: brainstorming → plan → TDD → review.</li>
+        </ul>
+      </section>
+
+      <!-- 8 -->
+      <section id="workflow" class="card">
+        <h2>8. Рабочий цикл задачи</h2>
+        <ol class="flow">
+          <li><b>Исследовать.</b> «Прочитай модуль X и объясни, как работает Y. Код не меняй.»</li>
+          <li><b>Спланировать.</b> Plan mode или Spec Kit. Проверить план глазами.</li>
+          <li><b>Сначала тесты.</b> «Напиши тест, воспроизводящий баг. Убедись, что он падает.»</li>
+          <li><b>Реализовать</b> маленькими шагами, каждый шаг проверяется тестом / линтером.</li>
+          <li><b>Проверить.</b> Попросите запустить тесты, линт, типы. Для UI — скриншот.</li>
+          <li><b>Review.</b> <code>/review</code> или отдельный subagent-ревьюер, потом человек.</li>
+          <li><b>Зафиксировать знания.</b> Новая конвенция → CLAUDE.md. Решение → ADR.</li>
+        </ol>
+        <p class="tip">💡 Дайте Claude способ проверить себя (тесты, линтер, скриншот) — это сильнее всего повышает качество результата.</p>
+      </section>
+
+      <!-- 9 -->
+      <section id="extend" class="card">
+        <h2>9. Skills, subagents, hooks, MCP — что когда</h2>
+        <table class="compare">
+          <thead><tr><th>Механизм</th><th>Для чего</th><th>Пример</th></tr></thead>
+          <tbody>
+            <tr><td><b>Slash command</b><br><code>.claude/commands/*.md</code></td><td>Повторяющийся промпт, который запускает человек</td><td><code>/review-pr 123</code>, <code>/fix-issue</code></td></tr>
+            <tr><td><b>Skill</b><br><code>.claude/skills/*/SKILL.md</code></td><td>Инструкции + скрипты, которые Claude подгружает сам, когда задача подходит. В контексте только короткое описание, пока skill не нужен.</td><td>«как делать релиз», «как писать миграцию»</td></tr>
+            <tr><td><b>Subagent</b><br><code>.claude/agents/*.md</code></td><td>Отдельный контекст для изолированной задачи; возвращает только результат</td><td>code-reviewer, test-writer, исследователь репо</td></tr>
+            <tr><td><b>Hook</b><br><code>settings.json</code></td><td>Детерминированные действия на события — выполняет harness, а не модель</td><td>форматировать после Edit, блокировать запись в <code>.env</code></td></tr>
+            <tr><td><b>MCP</b><br><code>.mcp.json</code></td><td>Доступ к внешним системам и данным</td><td>Jira/Linear, БД, документация, браузер</td></tr>
+          </tbody>
+        </table>
+        <details>
+          <summary>Пример hook: автоформатирование после редактирования</summary>
+<pre><code>{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "npx prettier --write \"$CLAUDE_PROJECT_DIR\" --log-level silent || true" }
+        ]
+      }
+    ]
+  }
+}</code></pre>
+          <p>Правило: если что-то должно происходить <b>всегда</b> — это hook, а не просьба в CLAUDE.md.</p>
+        </details>
+        <details>
+          <summary>Пример subagent: .claude/agents/code-reviewer.md</summary>
+<pre><code>---
+name: code-reviewer
+description: Reviews the current diff for bugs, security and convention violations. Use after implementing a change.
+tools: Read, Grep, Glob, Bash
+---
+You are a strict reviewer. Run `git diff`, read CLAUDE.md conventions,
+report only real issues with file:line and a concrete fix. No style nitpicks.</code></pre>
+        </details>
+      </section>
+
+      <!-- 10 -->
+      <section id="practices" class="card">
+        <h2>10. Лучшие практики</h2>
+        <div class="grid2">
+          <div>
+            <h3>Промпты</h3>
+            <ul>
+              <li>Конкретика: файл, функция, ожидаемое поведение, критерий «готово».</li>
+              <li>Говорите, <b>чего не делать</b>: «не меняй публичный API».</li>
+              <li>Скриншоты, логи ошибок, примеры вход/выход — вставляйте прямо в чат.</li>
+              <li>Для сложного — попросите сначала план, потом код.</li>
+              <li>Останавливайте рано: <kbd>Esc</kbd> — прервать, <kbd>Esc</kbd><kbd>Esc</kbd> / <code>/rewind</code> — откатиться.</li>
+            </ul>
+            <h3>Git</h3>
+            <ul>
+              <li>Отдельная ветка на задачу; частые маленькие коммиты — легко откатить.</li>
+              <li>Параллельные задачи — через <code>git worktree</code>, по сессии Claude на каждый.</li>
+              <li>Не разрешайте <code>git push</code> без подтверждения.</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Качество и безопасность</h3>
+            <ul>
+              <li>Код от Claude проходит тот же review, что и код человека. Автор PR отвечает за него.</li>
+              <li>Секреты — в <code>deny</code>, никогда в CLAUDE.md или <code>.mcp.json</code>.</li>
+              <li>Доверяйте MCP-серверам и plugins только из проверенных источников — они выполняют код на вашей машине.</li>
+              <li>Проверяйте «уверенные» утверждения об API — тестами или через Context7.</li>
+            </ul>
+            <h3>Команда</h3>
+            <ul>
+              <li>Делитесь удачными промптами как slash-командами в репо.</li>
+              <li>Раз в спринт — 15 мин «что сработало / что нет с Claude» → обновить CLAUDE.md и это руководство.</li>
+              <li>Автоматизация в CI: <code>claude -p "…"</code> (headless) или GitHub Action для review PR.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 11 -->
+      <section id="cheatsheet" class="card">
+        <h2>11. Шпаргалка команд</h2>
+        <table class="compare">
+          <thead><tr><th>Команда / клавиша</th><th>Что делает</th></tr></thead>
+          <tbody>
+            <tr><td><code>/init</code></td><td>Создать CLAUDE.md</td></tr>
+            <tr><td><code>/memory</code></td><td>Редактировать файлы памяти</td></tr>
+            <tr><td><code>/clear</code></td><td>Очистить контекст (новая задача)</td></tr>
+            <tr><td><code>/compact [что сохранить]</code></td><td>Сжать историю</td></tr>
+            <tr><td><code>/context</code></td><td>Что занимает контекст</td></tr>
+            <tr><td><code>/cost</code>, <code>/usage</code></td><td>Расходы / лимиты</td></tr>
+            <tr><td><code>/model</code></td><td>Выбор модели</td></tr>
+            <tr><td><code>/permissions</code></td><td>Разрешения</td></tr>
+            <tr><td><code>/mcp</code></td><td>Состояние MCP-серверов</td></tr>
+            <tr><td><code>/agents</code></td><td>Управление subagents</td></tr>
+            <tr><td><code>/hooks</code></td><td>Просмотр hooks</td></tr>
+            <tr><td><code>/plugin</code></td><td>Plugins и marketplaces</td></tr>
+            <tr><td><code>/review</code></td><td>Review изменений</td></tr>
+            <tr><td><code>/rewind</code>, <kbd>Esc</kbd><kbd>Esc</kbd></td><td>Откатить разговор/код к точке</td></tr>
+            <tr><td><kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Переключение режимов (auto-accept / plan)</td></tr>
+            <tr><td><kbd>Esc</kbd></td><td>Прервать Claude</td></tr>
+            <tr><td><code>@путь/к/файлу</code></td><td>Добавить файл в контекст</td></tr>
+            <tr><td><code>!команда</code></td><td>Выполнить shell-команду напрямую</td></tr>
+            <tr><td><code>claude -c</code> / <code>claude -r</code></td><td>Продолжить последнюю / выбрать сессию</td></tr>
+            <tr><td><code>claude -p "…"</code></td><td>Headless-режим для скриптов и CI</td></tr>
+          </tbody>
+        </table>
+        <p class="meta">Полный актуальный список — <code>/help</code>.</p>
+      </section>
+
+      <!-- 12 -->
+      <section id="onboarding" class="card">
+        <h2>12. Чеклист онбординга нового разработчика</h2>
+        <ul class="checklist" id="checklist">
+          <li><label><input type="checkbox"> Установил Claude Code, залогинился, <code>/status</code> показывает правильный аккаунт</label></li>
+          <li><label><input type="checkbox"> Прочитал <code>CLAUDE.md</code> проекта</label></li>
+          <li><label><input type="checkbox"> <code>/mcp</code> — общие серверы подключены</label></li>
+          <li><label><input type="checkbox"> Настроил statusline с отображением контекста</label></li>
+          <li><label><input type="checkbox"> Попробовал Plan mode на небольшой задаче</label></li>
+          <li><label><input type="checkbox"> Попробовал Spec Kit на фиче (<code>specify init</code>)</label></li>
+          <li><label><input type="checkbox"> Знаю, когда делать <code>/clear</code> и <code>/compact</code></label></li>
+          <li><label><input type="checkbox"> Знаю, где лежат командные slash-команды и agents</label></li>
+          <li><label><input type="checkbox"> Секреты закрыты в <code>permissions.deny</code></label></li>
+        </ul>
+        <p class="meta">Состояние чеклиста сохраняется локально в вашем браузере (общее для обоих языков).</p>
+      </section>
+
+      <footer>
+        <p>Руководство живое: предлагайте изменения через PR. Проверяйте детали в <a href="https://docs.claude.com/en/docs/claude-code/overview" target="_blank" rel="noopener">официальной документации Claude Code</a> — продукт быстро обновляется.</p>
+      </footer>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
