@@ -1,0 +1,22 @@
+{
+  "0": "apply.mjs",
+  "1": "File Structure",
+  "2": "apply.test.mjs",
+  "3": "setup-kit — автоналаштування Claude Code для команди",
+  "4": "components.mjs",
+  "5": "fsops.mjs",
+  "6": "merge.mjs",
+  "7": "script.js",
+  "8": "package.json",
+  "9": "setup-kit — автоналаштування Claude Code / автонастройка Claude Code",
+  "10": "Project: <name>",
+  "11": "Claude Code для команди",
+  "12": "ADR-NNNN: <title>",
+  "13": "node_ok",
+  "14": "setup.ps1",
+  "15": "lang.js",
+  "16": "code-reviewer.md",
+  "17": "test-writer.md",
+  "18": "review-pr.md",
+  "19": "format.mjs"
+}

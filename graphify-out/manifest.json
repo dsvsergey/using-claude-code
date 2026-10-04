@@ -1,0 +1,202 @@
+{
+  "lang.js": {
+    "mtime": 1790862766.059982,
+    "ast_hash": "0b46ee2f2f2945a4cec482a2701cf540",
+    "semantic_hash": ""
+  },
+  "script.js": {
+    "mtime": 1790862770.309583,
+    "ast_hash": "29b41457115db0e4a07c29f316ba35c5",
+    "semantic_hash": ""
+  },
+  "setup-kit/lib/apply.mjs": {
+    "mtime": 1791099020.3973079,
+    "ast_hash": "fd03d38a98e43aa12654e9f6bb959b48",
+    "semantic_hash": ""
+  },
+  "setup-kit/lib/components.mjs": {
+    "mtime": 1791098678.6619952,
+    "ast_hash": "67a653cfc4cf999ce1c7cd5c9a3fb71e",
+    "semantic_hash": ""
+  },
+  "setup-kit/lib/doctor.mjs": {
+    "mtime": 1791098808.6084344,
+    "ast_hash": "811ecd966131fdcc54954b2468efd54f",
+    "semantic_hash": ""
+  },
+  "setup-kit/lib/fsops.mjs": {
+    "mtime": 1791096884.3464074,
+    "ast_hash": "aec29aefe1e414cc616203c6449ea60a",
+    "semantic_hash": ""
+  },
+  "setup-kit/lib/i18n.mjs": {
+    "mtime": 1791098834.9494636,
+    "ast_hash": "ef24c34e82dca7cce8821da997f3f9ba",
+    "semantic_hash": ""
+  },
+  "setup-kit/lib/merge.mjs": {
+    "mtime": 1791096745.1230414,
+    "ast_hash": "a0f1f4c9266082a322a17378d47f7d11",
+    "semantic_hash": ""
+  },
+  "setup-kit/lib/presets.mjs": {
+    "mtime": 1791096784.8069704,
+    "ast_hash": "7790b3cbe750203f6185ac21e6612945",
+    "semantic_hash": ""
+  },
+  "setup-kit/lib/run.mjs": {
+    "mtime": 1791096814.7649155,
+    "ast_hash": "7627368f8273d25d45da1a22c373e8e5",
+    "semantic_hash": ""
+  },
+  "setup-kit/package.json": {
+    "mtime": 1791096714.7320068,
+    "ast_hash": "3f62a6fb2c8c957af05843ed28e07a13",
+    "semantic_hash": ""
+  },
+  "setup-kit/setup.ps1": {
+    "mtime": 1791099143.8443494,
+    "ast_hash": "14b5356ebbb3ef8d24b5704dcf545a6f",
+    "semantic_hash": ""
+  },
+  "setup-kit/setup.sh": {
+    "mtime": 1791099139.1460938,
+    "ast_hash": "ff765b62c701f5a11f09418c6e846157",
+    "semantic_hash": ""
+  },
+  "setup-kit/templates/hooks/prettier.json": {
+    "mtime": 1791098539.4942544,
+    "ast_hash": "1b6dc9f6a020c420f81052b8b71a5983",
+    "semantic_hash": ""
+  },
+  "setup-kit/templates/mcp/context7.json": {
+    "mtime": 1791098539.4847848,
+    "ast_hash": "71fbe0981638776043d09e33b2cff0f6",
+    "semantic_hash": ""
+  },
+  "setup-kit/templates/mcp/serena.json": {
+    "mtime": 1791098659.0799077,
+    "ast_hash": "4b6b38cb1ec61b3a0769e682e4c34d4a",
+    "semantic_hash": ""
+  },
+  "setup-kit/templates/project/.claude/hooks/format.mjs": {
+    "mtime": 1791098539.5195034,
+    "ast_hash": "d09cbe45bd08266e469d36f041d6655c",
+    "semantic_hash": ""
+  },
+  "setup-kit/templates/project/.claude/settings.json": {
+    "mtime": 1791098539.5112813,
+    "ast_hash": "0acf7ca3b9310b4cc62f652f2b602bdf",
+    "semantic_hash": ""
+  },
+  "setup-kit/templates/user/settings.json": {
+    "mtime": 1791098539.4673069,
+    "ast_hash": "9154aad3b15c4ae11a9e1f79826f99d2",
+    "semantic_hash": ""
+  },
+  "setup-kit/templates/user/statusline.json": {
+    "mtime": 1791098539.4758587,
+    "ast_hash": "a268aa87f9738ec9c2f1e4abe370a4a1",
+    "semantic_hash": ""
+  },
+  "setup-kit/test/apply.test.mjs": {
+    "mtime": 1791098856.478303,
+    "ast_hash": "ad85a1440687628f34203836ae169d78",
+    "semantic_hash": ""
+  },
+  "setup-kit/test/components.test.mjs": {
+    "mtime": 1791098659.0889666,
+    "ast_hash": "97c75f9856411c077239df9544970bab",
+    "semantic_hash": ""
+  },
+  "setup-kit/test/doctor.test.mjs": {
+    "mtime": 1791098798.6723032,
+    "ast_hash": "281a59ee5e3b99b3cc7d681a356cf76a",
+    "semantic_hash": ""
+  },
+  "setup-kit/test/fsops.test.mjs": {
+    "mtime": 1791096850.505682,
+    "ast_hash": "b30f5d696359bf8b60c5036dd8155984",
+    "semantic_hash": ""
+  },
+  "setup-kit/test/helpers.mjs": {
+    "mtime": 1791096828.80968,
+    "ast_hash": "976b00d41d3a0ead2fbb64cb47832520",
+    "semantic_hash": ""
+  },
+  "setup-kit/test/i18n.test.mjs": {
+    "mtime": 1791098818.1069372,
+    "ast_hash": "4ac5f7f99caf88229c13bad8d50bf060",
+    "semantic_hash": ""
+  },
+  "setup-kit/test/merge.test.mjs": {
+    "mtime": 1791096728.8229818,
+    "ast_hash": "3e4b0a36c1b2dfdc86f068116053b36e",
+    "semantic_hash": ""
+  },
+  "setup-kit/test/presets.test.mjs": {
+    "mtime": 1791096765.8897989,
+    "ast_hash": "2901a9917035ba7cf48ec61e90adf2db",
+    "semantic_hash": ""
+  },
+  "setup-kit/test/run.test.mjs": {
+    "mtime": 1791096804.2943869,
+    "ast_hash": "b9e2fda6d6b97677ca3392764450089a",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1790862844.041629,
+    "ast_hash": "20ebce9666f30560e6bf5407c7f0f57c",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/plans/2026-10-04-setup-kit.md": {
+    "mtime": 1791096362.5519269,
+    "ast_hash": "1347bd4a38492ae4f73005983c36af2b",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/specs/2026-10-04-setup-kit-design.md": {
+    "mtime": 1791065642.4243386,
+    "ast_hash": "e572a70cf4f02948ed452472ae802c7a",
+    "semantic_hash": ""
+  },
+  "index.html": {
+    "mtime": 1791099330.6182659,
+    "ast_hash": "531fcede8e529a21ec413db915646646",
+    "semantic_hash": ""
+  },
+  "index.ru.html": {
+    "mtime": 1791099341.9250724,
+    "ast_hash": "4e860713d045e8293d54bf07baa2de05",
+    "semantic_hash": ""
+  },
+  "setup-kit/README.md": {
+    "mtime": 1791099155.0450306,
+    "ast_hash": "55a20bb664e246ec15fe9ffb747c27c8",
+    "semantic_hash": ""
+  },
+  "setup-kit/templates/project/.claude/agents/code-reviewer.md": {
+    "mtime": 1791098539.5282023,
+    "ast_hash": "86a22c75afb6fa627bac8cc962dba043",
+    "semantic_hash": ""
+  },
+  "setup-kit/templates/project/.claude/agents/test-writer.md": {
+    "mtime": 1791098539.536912,
+    "ast_hash": "6f9493e77a0c8f17b25d60829a25265e",
+    "semantic_hash": ""
+  },
+  "setup-kit/templates/project/.claude/commands/review-pr.md": {
+    "mtime": 1791098539.5448525,
+    "ast_hash": "29c3f8b45e6139610e8b40b38698674f",
+    "semantic_hash": ""
+  },
+  "setup-kit/templates/project/CLAUDE.md": {
+    "mtime": 1791098539.5033102,
+    "ast_hash": "0e8079a176fe10c2fcaec396c3eefa71",
+    "semantic_hash": ""
+  },
+  "setup-kit/templates/project/docs/adr/0000-template.md": {
+    "mtime": 1791098539.5540779,
+    "ast_hash": "3650419ca3368d7ac86dd19d2f01946c",
+    "semantic_hash": ""
+  }
+}
