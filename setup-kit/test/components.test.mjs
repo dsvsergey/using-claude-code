@@ -96,3 +96,83 @@ test('statusline uses ccstatusline; ccusage needs npx', () => {
   assert.equal(byId('ccusage').plan(ctx)[0].type, 'note');
   assert.equal(byId('ccusage').plan(ctxOf({ run: { which: () => null } }))[0].type, 'fail');
 });
+
+test('registry order: user components first, then project', () => {
+  assert.deepEqual(COMPONENTS.map((c) => c.id), [
+    'claude', 'user-settings', 'statusline', 'ccusage', 'engram',
+    'claude-md', 'project-settings', 'context7', 'format-hook', 'agents', 'adr', 'serena', 'graphify', 'speckit',
+  ]);
+});
+
+test('claude: already installed on macOS → skip', () => {
+  assert.deepEqual(byId('claude').plan(ctxOf()).map((a) => a.type), ['skip']);
+});
+
+test('claude: missing on Unix → official install.sh', () => {
+  const [a] = byId('claude').plan(ctxOf({ run: { which: () => null } }));
+  assert.equal(a.command, 'curl -fsSL https://claude.ai/install.sh | bash');
+  assert.equal(a.confirm, true);
+});
+
+test('claude: Windows without .local\\bin in user PATH → install + PATH fix', () => {
+  const ctx = ctxOf({ platform: 'win32', home: 'C:\\Users\\Ivan Petrenko', run: { which: () => null, capture: () => ({ code: 0, stdout: 'C:\\Tools;\r\n' }) } });
+  const actions = byId('claude').plan(ctx);
+  assert.equal(actions.length, 2);
+  assert.match(actions[0].command, /irm https:\/\/claude\.ai\/install\.ps1 \| iex/);
+  assert.match(actions[1].command, /SetEnvironmentVariable\('Path'/);
+  assert.ok(!actions[1].command.includes('Ivan Petrenko'), 'path must come from $env:USERPROFILE, not interpolated');
+});
+
+test('claude: Windows with .local\\bin already in user PATH → no PATH fix', () => {
+  const ctx = ctxOf({ platform: 'win32', home: 'C:\\Users\\ivan', run: { which: () => 'C:\\x\\claude.exe', capture: () => ({ code: 0, stdout: 'C:\\Users\\ivan\\.local\\bin\;C:\\Tools\r\n' }) } });
+  assert.deepEqual(byId('claude').plan(ctx).map((a) => a.type), ['skip']);
+});
+
+test('engram: skipped when plugin already enabled', () => {
+  const ctx = ctxOf();
+  fs.mkdirSync(path.join(ctx.home, '.claude'));
+  fs.writeFileSync(path.join(ctx.home, '.claude', 'settings.json'), JSON.stringify({ enabledPlugins: { 'engram@engram': true } }));
+  assert.deepEqual(byId('engram').plan(ctx).map((a) => a.type), ['skip']);
+});
+
+test('engram: brew install, then plugin install through claude', () => {
+  const ctx = ctxOf({ run: { which: (c) => (c === 'brew' ? '/bin/brew' : null) } });
+  const actions = byId('engram').plan(ctx);
+  assert.equal(actions[0].command, 'brew install gentleman-programming/tap/engram');
+  assert.deepEqual(actions.slice(1, 3).map((a) => [a.type, a.tool]), [['require', 'engram'], ['require', 'claude']]);
+  assert.equal(actions[3].command, 'claude plugin marketplace add Gentleman-Programming/engram && claude plugin install engram');
+});
+
+test('engram: go fallback; neither brew nor go → fail with install link', () => {
+  const go = byId('engram').plan(ctxOf({ run: { which: (c) => (c === 'go' ? '/bin/go' : null) } }));
+  assert.equal(go[0].command, 'go install github.com/Gentleman-Programming/engram/v3/cmd/engram@latest');
+  const none = byId('engram').plan(ctxOf({ run: { which: () => null } }));
+  assert.equal(none[0].type, 'fail');
+  assert.match(none[0].reason, /INSTALLATION\.md/);
+});
+
+test('serena: requires uv (official installer) and adds the MCP server', () => {
+  const ctx = ctxOf();
+  const [req, mcp] = byId('serena').plan(ctx);
+  assert.deepEqual(req, { type: 'require', tool: 'uv', install: 'curl -LsSf https://astral.sh/uv/install.sh | sh' });
+  assert.ok(mcp.template.mcpServers.serena.args.includes('--project-from-cwd'));
+  const [winReq] = byId('serena').plan(ctxOf({ platform: 'win32' }));
+  assert.match(winReq.install, /irm https:\/\/astral\.sh\/uv\/install\.ps1 \| iex/);
+});
+
+test('graphify: installs via uv tool when missing, builds graph in project cwd', () => {
+  const ctx = ctxOf({ run: { which: (c) => (c === 'uv' ? '/bin/uv' : null) } });
+  const actions = byId('graphify').plan(ctx);
+  assert.deepEqual(actions.map((a) => a.command ?? a.type), ['require', 'uv tool install graphifyy', 'graphify install', 'graphify update .']);
+  assert.equal(actions[3].cwd, ctx.project);
+});
+
+test('speckit: skipped when .specify exists; --force only with --yes', () => {
+  const ctx = ctxOf();
+  const [, init] = byId('speckit').plan(ctx);
+  assert.equal(init.command, 'uvx --from git+https://github.com/github/spec-kit.git specify init --here --integration claude');
+  assert.equal(init.cwd, ctx.project);
+  assert.match(byId('speckit').plan({ ...ctx, yes: true })[1].command, / --force$/);
+  fs.mkdirSync(path.join(ctx.project, '.specify'));
+  assert.deepEqual(byId('speckit').plan(ctx).map((a) => a.type), ['skip']);
+});

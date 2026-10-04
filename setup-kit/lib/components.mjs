@@ -15,10 +15,44 @@ function readJson(file) {
   return r.ok ? r.value : null;
 }
 
+const PS = (cmd) => `powershell -NoProfile -ExecutionPolicy Bypass -Command "${cmd}"`;
+const INSTALLERS = {
+  claude: { win32: PS('irm https://claude.ai/install.ps1 | iex'), unix: 'curl -fsSL https://claude.ai/install.sh | bash' },
+  uv: { win32: PS('irm https://astral.sh/uv/install.ps1 | iex'), unix: 'curl -LsSf https://astral.sh/uv/install.sh | sh' },
+};
+const installer = (ctx, tool) => INSTALLERS[tool][ctx.platform === 'win32' ? 'win32' : 'unix'];
+const requireUv = (ctx) => ({ type: 'require', tool: 'uv', install: installer(ctx, 'uv') });
+
+// The native installer puts claude.exe in %USERPROFILE%\.local\bin but does not always add it to PATH.
+const WIN_GET_USER_PATH = PS("[Environment]::GetEnvironmentVariable('Path','User')");
+const WIN_ADD_LOCAL_BIN = PS(
+  "[Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path','User') + ';' + $env:USERPROFILE + '\\.local\\bin', 'User')",
+);
+
+function winLocalBinMissing(ctx) {
+  const bin = path.win32.join(ctx.home, '.local', 'bin').toLowerCase();
+  const entries = ctx.run.capture(WIN_GET_USER_PATH).stdout.toLowerCase().split(';').map((s) => s.trim().replace(/\\+$/, ''));
+  return !entries.includes(bin);
+}
+
 const BOTH = ['minimal', 'full'];
 const FULL = ['full'];
 
 export const COMPONENTS = [
+  {
+    id: 'claude',
+    scope: 'user',
+    presets: BOTH,
+    desc: { uk: 'Claude Code CLI (+ PATH на Windows)', ru: 'Claude Code CLI (+ PATH в Windows)' },
+    plan(ctx) {
+      const actions = [];
+      if (!ctx.run.which('claude')) actions.push({ type: 'exec', label: 'install claude', command: installer(ctx, 'claude'), confirm: true });
+      if (ctx.platform === 'win32' && winLocalBinMissing(ctx)) {
+        actions.push({ type: 'exec', label: 'add %USERPROFILE%\\.local\\bin to PATH', command: WIN_ADD_LOCAL_BIN, confirm: true });
+      }
+      return actions.length ? actions : [{ type: 'skip', target: 'claude', reason: 'already installed' }];
+    },
+  },
   {
     id: 'user-settings',
     scope: 'user',
@@ -42,6 +76,32 @@ export const COMPONENTS = [
       ctx.run.which('npx')
         ? [{ type: 'note', text: 'ccusage: npx ccusage@latest daily' }]
         : [{ type: 'fail', target: 'ccusage', reason: 'npx not found' }],
+  },
+  {
+    id: 'engram',
+    scope: 'user',
+    presets: FULL,
+    desc: { uk: 'engram — локальна памʼять між сесіями', ru: 'engram — локальная память между сессиями' },
+    plan(ctx) {
+      const plugins = readJson(userSettings(ctx))?.enabledPlugins ?? {};
+      if (Object.keys(plugins).some((k) => k.startsWith('engram@'))) {
+        return [{ type: 'skip', target: 'engram', reason: 'plugin already enabled' }];
+      }
+      const actions = [];
+      if (!ctx.run.which('engram')) {
+        if (ctx.run.which('brew')) {
+          actions.push({ type: 'exec', label: 'install engram', command: 'brew install gentleman-programming/tap/engram', confirm: true });
+        } else if (ctx.run.which('go')) {
+          actions.push({ type: 'exec', label: 'install engram', command: 'go install github.com/Gentleman-Programming/engram/v3/cmd/engram@latest', confirm: true });
+        } else {
+          return [{ type: 'fail', target: 'engram', reason: 'need brew or go: https://github.com/Gentleman-Programming/engram/blob/main/docs/INSTALLATION.md' }];
+        }
+      }
+      actions.push({ type: 'require', tool: 'engram', hint: 'engram not found after install' });
+      actions.push({ type: 'require', tool: 'claude', hint: 'install the claude component first' });
+      actions.push({ type: 'exec', label: 'engram plugin', command: 'claude plugin marketplace add Gentleman-Programming/engram && claude plugin install engram' });
+      return actions;
+    },
   },
   {
     id: 'claude-md',
@@ -96,5 +156,44 @@ export const COMPONENTS = [
     presets: FULL,
     desc: { uk: 'docs/adr/ з шаблоном рішення', ru: 'docs/adr/ с шаблоном решения' },
     plan: (ctx) => [copy(ctx, 'docs/adr/0000-template.md')],
+  },
+  {
+    id: 'serena',
+    scope: 'project',
+    presets: FULL,
+    desc: { uk: 'Serena MCP — семантична навігація по коду (потрібен uv)', ru: 'Serena MCP — семантическая навигация по коду (нужен uv)' },
+    plan: (ctx) => [requireUv(ctx), { type: 'json', target: inProject(ctx, '.mcp.json'), template: json(ctx, 'mcp/serena.json') }],
+  },
+  {
+    id: 'graphify',
+    scope: 'project',
+    presets: FULL,
+    desc: { uk: 'graphify — граф знань репозиторію (потрібен uv)', ru: 'graphify — граф знаний репозитория (нужен uv)' },
+    plan(ctx) {
+      const actions = [requireUv(ctx)];
+      if (!ctx.run.which('graphify')) actions.push({ type: 'exec', label: 'install graphify', command: 'uv tool install graphifyy', confirm: true });
+      actions.push({ type: 'exec', label: 'graphify skill', command: 'graphify install' });
+      actions.push({ type: 'exec', label: 'graphify update', command: 'graphify update .', cwd: ctx.project });
+      return actions;
+    },
+  },
+  {
+    id: 'speckit',
+    scope: 'project',
+    presets: FULL,
+    desc: { uk: 'Spec Kit — spec-driven розробка (потрібен uv)', ru: 'Spec Kit — spec-driven разработка (нужен uv)' },
+    plan(ctx) {
+      if (fs.existsSync(inProject(ctx, '.specify'))) return [{ type: 'skip', target: 'speckit', reason: '.specify exists' }];
+      const force = ctx.yes ? ' --force' : '';
+      return [
+        requireUv(ctx),
+        {
+          type: 'exec',
+          label: 'specify init',
+          command: `uvx --from git+https://github.com/github/spec-kit.git specify init --here --integration claude${force}`,
+          cwd: ctx.project,
+        },
+      ];
+    },
   },
 ];
