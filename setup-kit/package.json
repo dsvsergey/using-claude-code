@@ -1,0 +1,7 @@
+{
+  "name": "claude-setup-kit",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "scripts": { "test": "node --test" }
+}
