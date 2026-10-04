@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { main, parseCli } from '../lib/apply.mjs';
 import { tmpDir, fixedNow, walk } from './helpers.mjs';
 
@@ -146,4 +148,12 @@ test('doctor command: exit 1 on a fresh project, 0 after minimal', async () => {
   assert.equal(await s.go('doctor'), 1);
   await s.go('--preset', 'minimal', '--yes');
   assert.equal(await s.go('doctor'), 0);
+});
+
+test('CLI runs when invoked through a symlinked path (macOS /tmp, OneDrive, junctions)', { skip: process.platform === 'win32' }, () => {
+  const link = path.join(tmpDir(), 'kit');
+  fs.symlinkSync(fileURLToPath(new URL('..', import.meta.url)), link);
+  const r = spawnSync(process.execPath, [path.join(link, 'lib', 'apply.mjs'), '--help'], { encoding: 'utf8' });
+  assert.equal(r.status, 0);
+  assert.match(r.stdout, /setup doctor/);
 });

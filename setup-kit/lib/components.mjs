@@ -24,15 +24,26 @@ const installer = (ctx, tool) => INSTALLERS[tool][ctx.platform === 'win32' ? 'wi
 const requireUv = (ctx) => ({ type: 'require', tool: 'uv', install: installer(ctx, 'uv') });
 
 // The native installer puts claude.exe in %USERPROFILE%\.local\bin but does not always add it to PATH.
-const WIN_GET_USER_PATH = PS("[Environment]::GetEnvironmentVariable('Path','User')");
+// Read/write the raw registry value so %VAR% entries stay unexpanded (REG_EXPAND_SZ). The literal
+// %USERPROFILE% is built from [char]37 because cmd.exe expands %VAR% even inside quotes. The dummy
+// variable set/unset broadcasts WM_SETTINGCHANGE so new terminals see the change.
+const WIN_RAW_USER_PATH = "(Get-Item HKCU:\\Environment).GetValue('Path','',[Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)";
+const WIN_GET_USER_PATH = PS(WIN_RAW_USER_PATH);
 const WIN_ADD_LOCAL_BIN = PS(
-  "[Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path','User') + ';' + $env:USERPROFILE + '\\.local\\bin', 'User')",
+  [
+    `$p = ${WIN_RAW_USER_PATH}`,
+    "$bin = [char]37 + 'USERPROFILE' + [char]37 + '\\.local\\bin'",
+    "$n = (@($p -split ';' | Where-Object { $_ }) + $bin) -join ';'",
+    "Set-ItemProperty -Path HKCU:\\Environment -Name Path -Value $n -Type ExpandString",
+    "[Environment]::SetEnvironmentVariable('SETUPKIT_REFRESH', '1', 'User')",
+    "[Environment]::SetEnvironmentVariable('SETUPKIT_REFRESH', $null, 'User')",
+  ].join('; '),
 );
 
 function winLocalBinMissing(ctx) {
-  const bin = path.win32.join(ctx.home, '.local', 'bin').toLowerCase();
+  const wanted = [path.win32.join(ctx.home, '.local', 'bin'), '%userprofile%\\.local\\bin'].map((s) => s.toLowerCase());
   const entries = ctx.run.capture(WIN_GET_USER_PATH).stdout.toLowerCase().split(';').map((s) => s.trim().replace(/\\+$/, ''));
-  return !entries.includes(bin);
+  return !entries.some((e) => wanted.includes(e));
 }
 
 const BOTH = ['minimal', 'full'];
@@ -49,6 +60,7 @@ export const COMPONENTS = [
       if (!ctx.run.which('claude')) actions.push({ type: 'exec', label: 'install claude', command: installer(ctx, 'claude'), confirm: true });
       if (ctx.platform === 'win32' && winLocalBinMissing(ctx)) {
         actions.push({ type: 'exec', label: 'add %USERPROFILE%\\.local\\bin to PATH', command: WIN_ADD_LOCAL_BIN, confirm: true });
+        actions.push({ type: 'note', text: 'Windows: open a new terminal so the PATH change applies' });
       }
       return actions.length ? actions : [{ type: 'skip', target: 'claude', reason: 'already installed' }];
     },

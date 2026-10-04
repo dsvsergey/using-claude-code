@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline/promises';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { COMPONENTS } from './components.mjs';
 import { runDoctor } from './doctor.mjs';
@@ -185,5 +185,15 @@ export async function main(argv, deps = {}) {
   return entries.some((e) => e.status === 'failed') ? 1 : 0;
 }
 
-const invokedDirectly = process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href.toLowerCase() === import.meta.url.toLowerCase();
-if (invokedDirectly) main(process.argv.slice(2)).then((code) => process.exit(code));
+// Compare real paths: Node resolves symlinks/junctions in import.meta.url but not in argv[1].
+function invokedDirectly() {
+  if (!process.argv[1]) return false;
+  try {
+    const a = fs.realpathSync(process.argv[1]);
+    const b = fs.realpathSync(fileURLToPath(import.meta.url));
+    return process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
+  } catch {
+    return false;
+  }
+}
+if (invokedDirectly()) main(process.argv.slice(2)).then((code) => process.exit(code));

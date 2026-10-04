@@ -117,10 +117,24 @@ test('claude: missing on Unix → official install.sh', () => {
 test('claude: Windows without .local\\bin in user PATH → install + PATH fix', () => {
   const ctx = ctxOf({ platform: 'win32', home: 'C:\\Users\\Ivan Petrenko', run: { which: () => null, capture: () => ({ code: 0, stdout: 'C:\\Tools;\r\n' }) } });
   const actions = byId('claude').plan(ctx);
-  assert.equal(actions.length, 2);
+  assert.equal(actions.length, 3);
   assert.match(actions[0].command, /irm https:\/\/claude\.ai\/install\.ps1 \| iex/);
-  assert.match(actions[1].command, /SetEnvironmentVariable\('Path'/);
-  assert.ok(!actions[1].command.includes('Ivan Petrenko'), 'path must come from $env:USERPROFILE, not interpolated');
+  assert.ok(!actions[1].command.includes('Ivan Petrenko'), 'path must not be interpolated');
+  assert.equal(actions[2].type, 'note');
+});
+
+test('claude: Windows PATH fix keeps %VAR% entries unexpanded (REG_EXPAND_SZ) and avoids cmd %-expansion', () => {
+  const ctx = ctxOf({ platform: 'win32', home: 'C:\\Users\\ivan', run: { which: () => 'C:\\x\\claude.exe', capture: () => ({ code: 0, stdout: '' }) } });
+  const [fix] = byId('claude').plan(ctx);
+  assert.match(fix.command, /DoNotExpandEnvironmentNames/);
+  assert.match(fix.command, /-Type ExpandString/);
+  assert.ok(!fix.command.includes("SetEnvironmentVariable('Path'"), 'must not round-trip Path through [Environment]');
+  assert.ok(!/%\w+%/.test(fix.command), 'cmd.exe would expand %VAR% inside the command string');
+});
+
+test('claude: Windows user PATH with unexpanded %USERPROFILE%\\.local\\bin counts as present', () => {
+  const ctx = ctxOf({ platform: 'win32', home: 'C:\\Users\\ivan', run: { which: () => 'C:\\x\\claude.exe', capture: () => ({ code: 0, stdout: '%USERPROFILE%\\.local\\bin;C:\\Tools\r\n' }) } });
+  assert.deepEqual(byId('claude').plan(ctx).map((a) => a.type), ['skip']);
 });
 
 test('claude: Windows with .local\\bin already in user PATH → no PATH fix', () => {

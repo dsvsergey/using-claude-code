@@ -173,3 +173,13 @@ test('skip / fail / note actions', async () => {
     { status: 'failed', target: 'y', detail: 'bad' },
   ]);
 });
+
+test('json: two merges into one file in the same run keep the original bytes in the backup', async () => {
+  const d = tmpDir();
+  const f = path.join(d, 's.json');
+  fs.writeFileSync(f, '{"model":"opus"}');
+  const ctx = ctxOf();
+  await executeActions([{ type: 'json', target: f, template: { a: 1 } }], ctx);
+  await executeActions([{ type: 'json', target: f, template: { b: 2 } }], ctx);
+  assert.equal(fs.readFileSync(`${f}.bak-20261004-120000`, 'utf8'), '{"model":"opus"}');
+});

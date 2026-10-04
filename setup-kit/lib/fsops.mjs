@@ -41,7 +41,9 @@ function commit(target, before, after, status, detail, ctx) {
     return [{ ...entry('would', target, `${status} ${detail}`.trim()), diff: diffLines(before ?? '', after) }];
   }
   fs.mkdirSync(path.dirname(target), { recursive: true });
-  if (before !== null) fs.copyFileSync(target, `${target}.bak-${timestamp(ctx.now())}`);
+  // Several components may touch one file in a run: the first backup holds the original, keep it.
+  const bak = `${target}.bak-${timestamp(ctx.now())}`;
+  if (before !== null && !fs.existsSync(bak)) fs.copyFileSync(target, bak);
   fs.writeFileSync(target, after);
   return [entry(status, target, detail)];
 }
